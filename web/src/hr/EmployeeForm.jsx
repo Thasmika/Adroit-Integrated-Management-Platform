@@ -2,21 +2,20 @@ import React, { useState } from 'react';
 import { useStore, go } from '../core/store.jsx';
 import { OPERATING, docTypes } from '../core/shared.js';
 import { can } from '../core/access.js';
-import { Field, Icon, Empty } from '../core/ui.jsx';
+import { Field, Icon, Empty, DateInput } from '../core/ui.jsx';
 import { empIdFromParam, empParam, HR_STATUSES } from './data.js';
 
 const NATS = ['Indian', 'Pakistani', 'Sri Lankan', 'Filipino', 'Bangladeshi', 'Nepali', 'Egyptian', 'Jordanian', 'Emirati', 'Other'];
-const EXP_TYPES = ['Passport', 'Employment Visa', 'Emirates ID', 'Health Insurance'];
+const EXP_TYPES = ['Passport', 'Employment Visa', 'Emirates ID', 'Labour Card', 'Health Insurance'];
 
 export default function EmployeeForm({ param }) {
   const { state, act, notify } = useStore();
   const [busy, setBusy] = useState(false);
   const cfg = state.config;
   const editing = param ? state.employees.find((e) => e.id === empIdFromParam(param)) : null;
-  const nextNo = 'New employee';
   const [f, setF] = useState(() => editing ? { ...editing } : {
-    id: nextNo, name: '', gender: 'Male', nationality: 'Indian', dob: '', department: cfg.departments[0].name, location: 'Head Office', designation: '',
-    mobile: '+971 ', email: '', status: 'Active', joined: '', company: OPERATING, sponsor: OPERATING, insurancePlan: 'Group Health Insurance', insuranceProvider: '',
+    id: '', code: '', molId: '', name: '', gender: 'Male', nationality: 'Indian', dob: '', department: cfg.departments[0].name, location: 'Head Office', designation: '',
+    mobile: '05', email: '', status: 'Active', joined: '', company: OPERATING, sponsor: OPERATING, insurancePlan: 'Group Health Insurance', insuranceProvider: '',
     emergencyContact: '', homeAddress: '', notes: '', photo: null, deptHead: '',
     docs: EXP_TYPES.map((type) => ({ type, name: type, ref: '', issuer: '', issued: '', expiry: '', file: null, renewal: null, history: [] })),
   });
@@ -31,11 +30,16 @@ export default function EmployeeForm({ param }) {
 
   const save = async (e) => {
     e.preventDefault();
+    const empNo = (f.id || '').trim();
+    if (!editing && !empNo) { setErr('Enter the employee number.'); return; }
+    if (!editing && state.employees.some((x) => x.id.toLowerCase() === empNo.toLowerCase())) { setErr(`Employee number ${empNo} already exists.`); return; }
+    const molId = (f.molId || '').trim();
+    if (molId && state.employees.some((x) => x.id !== editing?.id && (x.molId || '').toLowerCase() === molId.toLowerCase())) { setErr(`Emp (MOL) ID ${molId} is already recorded for another employee.`); return; }
     if (!f.name.trim() || !f.designation.trim() || !f.joined) { setErr('Full name, designation and joining date are required.'); return; }
     if (!editing && state.employees.some((x) => x.name.toLowerCase() === f.name.trim().toLowerCase() && x.dob === f.dob && f.dob)) { setErr('An employee with the same name and date of birth already exists.'); return; }
     const head = state.employees.find((x) => x.department === f.department)?.deptHead || '';
     const docs = f.docs.filter((d) => d.ref || d.expiry || d.file).map((d) => (d.type === 'Health Insurance' && !d.issuer ? { ...d, issuer: f.insuranceProvider } : d));
-    const emp = { ...f, name: f.name.trim(), deptHead: f.deptHead || head, docs };
+    const emp = { ...f, empNo: editing ? undefined : empNo, empCode: (f.code || '').trim(), molId, name: f.name.trim(), deptHead: f.deptHead || head, docs };
     setBusy(true); setErr('');
     try {
       const saved = await act.saveEmployee(emp, editing?.id);
@@ -47,18 +51,28 @@ export default function EmployeeForm({ param }) {
   return (
     <div className="page narrow">
       <button className="back" onClick={() => (editing ? go('hr-employee', param) : go('hr-employees'))}><Icon n="back" size={16} /> {editing ? editing.name : 'Employees'}</button>
-      <div className="page-head"><div><span className="eyebrow mono">{editing ? f.id : 'Employee number is assigned on save'}</span><h1>{editing ? 'Edit employee' : 'Add new employee'}</h1><p className="muted">Scanned copies and the photo are uploaded from the employee profile after saving.</p></div></div>
+      <div className="page-head"><div><span className="eyebrow mono">{editing ? f.id : 'New employee'}</span><h1>{editing ? 'Edit employee' : 'Add new employee'}</h1><p className="muted">Scanned copies and the photo are uploaded from the employee profile after saving.</p></div></div>
       <form className="stack" onSubmit={save}>
+        <fieldset className="panel">
+          <legend>Employee number &amp; codes</legend>
+          <div className="form-grid cols-3">
+            <Field label="Employee number" hint={editing ? 'The employee number cannot be changed after the record is created.' : 'Enter the number exactly as used by HR. It must be unique.'}>
+              <input id="ef-empno" value={f.id} onChange={set('id')} required={!editing} disabled={!!editing} maxLength={30} placeholder="e.g. EMP 0249" autoComplete="off" />
+            </Field>
+            <Field label="Employee code"><input id="ef-code" value={f.code || ''} onChange={set('code')} maxLength={40} autoComplete="off" /></Field>
+            <Field label="Emp (MOL) ID" hint="Ministry of Labour (MOHRE) person ID, shown on the labour card."><input id="ef-molid" value={f.molId || ''} onChange={set('molId')} maxLength={40} autoComplete="off" /></Field>
+          </div>
+        </fieldset>
         <fieldset className="panel">
           <legend>Identity &amp; contact</legend>
           <div className="form-grid cols-3">
             <Field label="Full name (as in passport)" span={2}><input id="ef-name" value={f.name} onChange={set('name')} required /></Field>
             <Field label="Gender"><select id="ef-gender" value={f.gender} onChange={set('gender')}><option>Male</option><option>Female</option></select></Field>
             <Field label="Nationality"><select id="ef-nat" value={f.nationality} onChange={set('nationality')}>{NATS.map((n) => <option key={n}>{n}</option>)}</select></Field>
-            <Field label="Date of birth"><input id="ef-dob" type="date" value={f.dob} onChange={set('dob')} /></Field>
-            <Field label="Mobile (UAE)"><input id="ef-mobile" value={f.mobile} onChange={set('mobile')} /></Field>
+            <Field label="Date of birth"><DateInput id="ef-dob" value={f.dob} onChange={set('dob')} /></Field>
+            <Field label="Mobile No"><input id="ef-mobile" value={f.mobile} onChange={set('mobile')} /></Field>
             <Field label="Email"><input id="ef-email" type="email" value={f.email} onChange={set('email')} /></Field>
-            <Field label="Emergency contact (home country)"><input id="ef-emerg" value={f.emergencyContact} onChange={set('emergencyContact')} /></Field>
+            <Field label="Emergency contact (with country code)"><input id="ef-emerg" value={f.emergencyContact} onChange={set('emergencyContact')} /></Field>
             <Field label="Home address"><input id="ef-addr" value={f.homeAddress} onChange={set('homeAddress')} /></Field>
           </div>
         </fieldset>
@@ -66,8 +80,8 @@ export default function EmployeeForm({ param }) {
           <legend>Employment, company &amp; sponsorship</legend>
           <div className="form-grid cols-3">
             <Field label="Designation"><input id="ef-desig" value={f.designation} onChange={set('designation')} required /></Field>
-            <Field label="Joining date"><input id="ef-joined" type="date" value={f.joined} onChange={set('joined')} required /></Field>
-            <Field label="Employment status"><select id="ef-status" value={f.status} onChange={set('status')}>{HR_STATUSES.map((s) => <option key={s}>{s}</option>)}</select></Field>
+            <Field label="Joining date"><DateInput id="ef-joined" value={f.joined} onChange={set('joined')} required /></Field>
+            <Field label="Employment status"><select id="ef-status" value={f.status} onChange={set('status')}>{(HR_STATUSES.includes(f.status) ? HR_STATUSES : [f.status, ...HR_STATUSES]).map((s) => <option key={s}>{s}</option>)}</select></Field>
             <Field label="Department"><select id="ef-dept" value={f.department} onChange={set('department')}>{cfg.departments.filter((d) => d.active || d.name === f.department).map((d) => <option key={d.id}>{d.name}</option>)}</select></Field>
             <Field label="Branch / location"><select id="ef-loc" value={f.location} onChange={set('location')}>{cfg.locations.filter((d) => d.active || d.name === f.location).map((d) => <option key={d.id}>{d.name}</option>)}</select></Field>
             <Field label="Operational company"><select id="ef-co" value={f.company} onChange={set('company')}>{cfg.companies.filter((c) => c.active).map((c) => <option key={c.id} value={c.name}>{c.short}</option>)}</select></Field>
@@ -90,8 +104,8 @@ export default function EmployeeForm({ param }) {
               <div className="doc-form-row" key={t}>
                 <strong>{t}</strong>
                 {t !== 'Health Insurance' ? <Field label="Number"><input id={'ef-no-' + t.replace(/ /g, '')} value={doc(t).ref} onChange={setDoc(t, 'ref')} /></Field> : <span className="muted small">policy no. above</span>}
-                <Field label="Issue date"><input id={'ef-is-' + t.replace(/ /g, '')} type="date" value={doc(t).issued} onChange={setDoc(t, 'issued')} /></Field>
-                <Field label="Expiry date"><input id={'ef-ex-' + t.replace(/ /g, '')} type="date" value={doc(t).expiry} onChange={setDoc(t, 'expiry')} /></Field>
+                <Field label="Issue date"><DateInput id={'ef-is-' + t.replace(/ /g, '')} value={doc(t).issued} onChange={setDoc(t, 'issued')} /></Field>
+                <Field label="Expiry date"><DateInput id={'ef-ex-' + t.replace(/ /g, '')} value={doc(t).expiry} onChange={setDoc(t, 'expiry')} /></Field>
               </div>
             ))}
           </div>

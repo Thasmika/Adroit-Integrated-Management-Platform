@@ -9,7 +9,7 @@ Access is denied by default. Each role grants modules, actions and, where needed
 | Area | System Administrator | Management | HR Officer | PRO / Compliance | Insurance Officer | Department Head | Fleet / Transport | Read-Only Auditor |
 |---|---|---|---|---|---|---|---|---|
 | Employee records | – | View | Create, edit | View | View | Own department, limited fields | – | View |
-| Employee documents | – | View | All, upload, renew | Passport, Visa, Emirates ID | Health insurance | – | – | View |
+| Employee documents | – | View | All, upload, renew | Passport, Visa, Emirates ID, Labour Card | Health insurance | – | – | View |
 | Leave | – | Approve / reject | Submit, HR review, rejoining | View | View | Submit, rejoining (own dept) | – | View |
 | Fleet records | – | View | – | – | View | – | Create, edit | View |
 | Fleet documents | – | View | – | – | Motor insurance | – | All, upload, renew | View |

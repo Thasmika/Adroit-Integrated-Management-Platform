@@ -14,7 +14,7 @@ export default function Home() {
   const [q, setQ] = useState('');
   const [ask, setAsk] = useState('');
   const first = u.name.split(' ')[0];
-  const greeting = <><span className="eyebrow">{TODAY.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span><h1>Good morning, {first}</h1></>;
+  const greeting = <><span className="eyebrow">{TODAY.toLocaleDateString('en-GB', { weekday: 'long' })} {fmt(TODAY)}</span><h1>Good morning, {first}</h1></>;
 
   if (!hr && !fl) {
     const cfg = state.config;

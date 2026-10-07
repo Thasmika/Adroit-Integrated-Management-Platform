@@ -12,7 +12,7 @@ import { env } from './env.js';
 
 export type Plan = { tool: string; input: Record<string, any> };
 
-const DOC_ENUM = ['Passport', 'Employment Visa', 'Emirates ID', 'Health Insurance', 'Vehicle Registration', 'Motor Insurance', 'Safety Certificate', 'Inspection / Test Certificate', 'Other Permit'];
+const DOC_ENUM = ['Passport', 'Employment Visa', 'Emirates ID', 'Labour Card', 'Health Insurance', 'Vehicle Registration', 'Motor Insurance', 'Safety Certificate', 'Inspection / Test Certificate', 'Other Permit'];
 const CAT_ENUM = ['Heavy Vehicle', 'Light Vehicle', 'Trailer', 'Heavy Machine / Equipment', 'Other Company Vehicle'];
 
 export const TOOLS = [
@@ -105,7 +105,7 @@ export const TOOLS = [
   },
 ];
 
-const SHORT: Record<string, string> = { 'Employment Visa': 'visas', 'Emirates ID': 'Emirates IDs', Passport: 'passports', 'Health Insurance': 'health insurance', 'Vehicle Registration': 'registration', 'Motor Insurance': 'motor insurance', 'Safety Certificate': 'safety certificates', 'Inspection / Test Certificate': 'inspection certificates', 'Other Permit': 'permits' };
+const SHORT: Record<string, string> = { 'Employment Visa': 'visas', 'Emirates ID': 'Emirates IDs', 'Labour Card': 'labour cards', Passport: 'passports', 'Health Insurance': 'health insurance', 'Vehicle Registration': 'registration', 'Motor Insurance': 'motor insurance', 'Safety Certificate': 'safety certificates', 'Inspection / Test Certificate': 'inspection certificates', 'Other Permit': 'permits' };
 const clean = (s: any) => String(s ?? '').replace(/[^\p{L}\p{N} &/.'-]/gu, ' ').trim().slice(0, 60);
 const types = (a: any) => (Array.isArray(a) ? a.filter((t) => DOC_ENUM.includes(t)).map((t) => SHORT[t]).join(' or ') : '');
 

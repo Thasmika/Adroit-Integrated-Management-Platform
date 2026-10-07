@@ -1,6 +1,6 @@
 // Append-only audit trail (§4.1): every create / update / approval / status change / upload / view / configuration change.
 import { Db, pool } from './db.js';
-import { ROLES } from '@adroit/core/src/core/shared.js';
+import { ROLES, isoToDmy } from '@adroit/core/src/core/shared.js';
 
 export type Actor = { id: string; name: string; role: string; scope?: string | null; ip?: string };
 
@@ -13,10 +13,12 @@ export async function audit(db: Db | null, actor: Actor | null, action: string, 
   );
 }
 
+// dates are written dd/mm/yyyy like everywhere else
+const show = (v: any) => (v == null || v === '' ? '—' : typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? isoToDmy(v) : v);
 // "field a → b; field c → d" for the fields that changed
 export function diffText(before: any, after: any, labels: Record<string, string>) {
   return Object.keys(labels)
     .filter((k) => before && after && after[k] !== undefined && String(before[k] ?? '') !== String(after[k] ?? ''))
-    .map((k) => `${labels[k]} ${before[k] ?? '—'} → ${after[k] ?? '—'}`)
+    .map((k) => `${labels[k]} ${show(before[k])} → ${show(after[k])}`)
     .join('; ');
 }

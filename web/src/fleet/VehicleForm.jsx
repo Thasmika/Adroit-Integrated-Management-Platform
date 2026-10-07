@@ -3,7 +3,7 @@ import { useStore, go } from '../core/store.jsx';
 import { requiredFor, docTypes, officerFor } from '../core/shared.js';
 import { can } from '../core/access.js';
 import { CATEGORIES, STATUSES, USAGE, assetIdFromParam, assetParam } from './data.js';
-import { Field, Icon, VehicleArt, Empty } from '../core/ui.jsx';
+import { Field, Icon, VehicleArt, Empty, DateInput } from '../core/ui.jsx';
 
 export default function VehicleForm({ param }) {
   const { state, act, notify } = useStore();
@@ -70,7 +70,7 @@ export default function VehicleForm({ param }) {
             <Field label={machine ? 'Registration no. (if road-registered)' : 'Registration (plate) no.'}><input id="vf-plate" value={f.plate} onChange={set('plate')} placeholder="e.g. Dubai K 48210" /></Field>
             <Field label="Chassis / VIN / serial no."><input id="vf-vin" value={f.vin} onChange={set('vin')} required /></Field>
             <Field label="Engine no."><input id="vf-engine" value={f.engine} onChange={set('engine')} /></Field>
-            <Field label="In service since"><input id="vf-acq" type="date" value={f.acquired} onChange={set('acquired')} /></Field>
+            <Field label="In service since"><DateInput id="vf-acq" value={f.acquired} onChange={set('acquired')} /></Field>
             <Field label={machine ? 'Hour meter' : 'Odometer'}><input id="vf-odo" value={f.odometer || ''} onChange={set('odometer')} placeholder={machine ? 'e.g. 4,200 hrs' : 'e.g. 125,000 km'} /></Field>
           </div>
         </fieldset>

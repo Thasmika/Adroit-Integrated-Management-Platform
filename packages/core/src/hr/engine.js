@@ -1,11 +1,12 @@
 import { fmt, daysUntil, officerFor, OPERATING, docStatus } from '../core/shared.js';
 import { DEPARTMENTS, hrExpiryRows as expiryRows, hrMissing } from './data.js';
-const DOC_TYPES = ['Passport', 'Employment Visa', 'Emirates ID', 'Health Insurance'];
+const DOC_TYPES = ['Passport', 'Employment Visa', 'Emirates ID', 'Labour Card', 'Health Insurance'];
 const SPONSORS = [OPERATING];
 
 // Rule-based stand-in for the HR AI assistant. It answers only from HR records
 // and always shows the rows it used, so every answer can be checked.
 const TYPE_WORDS = [
+  ['Labour Card', /labou?r\s*cards?|work\s*permits?/],
   ['Employment Visa', /\bvisas?\b|residen/],
   ['Emirates ID', /emirates\s*id|\beid\b|\bid cards?\b/],
   ['Passport', /passports?/],
@@ -23,6 +24,10 @@ function windowIn(t) {
   return 60;
 }
 function findEmp(state, t) {
+  // employee numbers are entered by HR and can have any form: match a typed number exactly first
+  const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const exact = state.employees.find((e) => e.id.length >= 3 && new RegExp(`(^|[^\\w-])${esc(e.id.toLowerCase())}($|[^\\w-])`).test(t));
+  if (exact) return exact;
   const m = t.match(/(?:emp(?:loyee)?\s*(?:no\.?|number|#)?\s*)(\d{1,4})\b/);
   if (m) return state.employees.find((e) => e.id === `EMP ${m[1].padStart(4, '0')}`);
   const byName = state.employees.filter((e) => t.includes(e.name.toLowerCase()));

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useStore, checkFile } from './store.jsx';
-import { Modal, Field } from './ui.jsx';
+import { Modal, Field, DateInput } from './ui.jsx';
 import { iso, TODAY, docTypes, docCfg, ACTION_STATES, fmt } from './shared.js';
 import { can } from './access.js';
 
-const CYCLE = { Passport: 3650, 'Employment Visa': 730, 'Emirates ID': 730 };
+const CYCLE = { Passport: 3650, 'Employment Visa': 730, 'Emirates ID': 730, 'Labour Card': 730 };
 
 // mode 'renew': the new document replaces the current one, the old one moves to history (§8.3 step 6, §9)
 // mode 'upload': add or update the current record and/or its scan
@@ -26,6 +26,7 @@ export function UploadDocModal({ module, owner, docType, mode = 'upload', onClos
   const [expiry, setExpiry] = useState(renew ? suggested : existing?.expiry || '');
   const [file, setFile] = useState(null);
   const [err, setErr] = useState('');
+  const isPhotoPage = type.includes('Passport Page') || type === 'Emirates ID Back';
   const switchType = (t) => { setType(t); const ex = owner.docs.find((d) => d.type === t); setName(ex?.name || (t === 'Other Permit' ? '' : t)); setRef(ex?.ref || ''); setIssuer(ex?.issuer || ''); setIssued(ex?.issued || ''); setExpiry(ex?.expiry || ''); };
 
   const save = async (e) => {
@@ -33,10 +34,10 @@ export function UploadDocModal({ module, owner, docType, mode = 'upload', onClos
     const fe = checkFile(file, state.config.system);
     if (fe) { setErr(fe); return; }
     if (renew && cfg.expires && (!expiry || expiry <= iso(TODAY))) { setErr('Enter the new expiry date. It must be after today.'); return; }
-    if (!renew && !existing && (!ref || (cfg.expires && !expiry))) { setErr(`Enter the reference number${cfg.expires ? ' and expiry date' : ''} for the new document.`); return; }
+    if (!renew && !existing && !isPhotoPage && (!ref || (cfg.expires && !expiry))) { setErr(`Enter the reference number${cfg.expires ? ' and expiry date' : ''} for the new document.`); return; }
     if (!renew && existing && !file && ref === existing.ref && expiry === existing.expiry && issuer === existing.issuer) { setErr('Choose a scanned file, or change the document details.'); return; }
     if (type === 'Other Permit' && !name.trim()) { setErr('Enter the permit name, e.g. RTA Heavy Vehicle Permit.'); return; }
-    const fields = { name: name || type, ref, issuer, issued, expiry: cfg.expires ? expiry : '' };
+    const fields = { name: name || type, ref: isPhotoPage ? '-' : ref, issuer, issued, expiry: cfg.expires ? expiry : '' };
     setBusy(true); setErr('');
     try {
       await act.saveDoc(module, owner.id, type, renew ? 'renew' : 'upload', fields, file);
@@ -59,10 +60,14 @@ export function UploadDocModal({ module, owner, docType, mode = 'upload', onClos
         )}
         {renew && <p className="note span-2">Current: <strong className="mono">{existing.ref}</strong>, expires <strong>{fmt(existing.expiry)}</strong>. It stays in the document history, and the open renewal action is marked Completed.</p>}
         {type === 'Other Permit' && <Field label="Permit name" span={2}><input id="doc-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. RTA Heavy Vehicle Permit" /></Field>}
-        <Field label={renew ? 'New document / policy no.' : 'Document / policy no.'}><input id="doc-ref" value={ref} onChange={(e) => setRef(e.target.value)} placeholder={existing?.ref || ''} /></Field>
-        <Field label={type.includes('Insurance') ? 'Provider / insurer' : 'Issued by'}><input id="doc-issuer" value={issuer} onChange={(e) => setIssuer(e.target.value)} /></Field>
-        <Field label="Issue date"><input id="doc-issued" type="date" value={issued} onChange={(e) => setIssued(e.target.value)} /></Field>
-        {cfg.expires && <Field label="Expiry date" hint={renew ? `Suggested from a ${Math.round(cycle / 365)}-year cycle` : null}><input id="doc-expiry" type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></Field>}
+        {!isPhotoPage && (
+          <>
+            <Field label={renew ? 'New document / policy no.' : 'Document / policy no.'}><input id="doc-ref" value={ref} onChange={(e) => setRef(e.target.value)} placeholder={existing?.ref || ''} /></Field>
+            <Field label={type.includes('Insurance') ? 'Provider / insurer' : 'Issued by'}><input id="doc-issuer" value={issuer} onChange={(e) => setIssuer(e.target.value)} /></Field>
+            <Field label="Issue date"><DateInput id="doc-issued" value={issued} onChange={(e) => setIssued(e.target.value)} /></Field>
+            {cfg.expires && <Field label="Expiry date" hint={renew ? `Suggested from a ${Math.round(cycle / 365)}-year cycle` : null}><DateInput id="doc-expiry" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></Field>}
+          </>
+        )}
         <Field label={`Scanned copy (${sys.fileTypes.join(', ')} · max ${sys.maxFileMB} MB)`} span={2}>
           <label className="drop">
             <input id="doc-file" type="file" accept={sys.fileTypes.map((t) => '.' + t.toLowerCase()).join(',') + (sys.fileTypes.includes('JPG') ? ',.jpeg' : '')} onChange={(e) => { setFile(e.target.files[0] || null); setErr(''); }} />

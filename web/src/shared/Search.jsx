@@ -18,7 +18,7 @@ export default function Search() {
 
   const res = useMemo(() => {
     if (t.length < 2) return { emps: [], assets: [], docs: [] };
-    const emps = scopeEmployees(u, state.employees).filter((e) => [e.id, e.id.replace(' ', ''), e.name, e.designation, ...(limited ? [] : [e.nationality, e.mobile])].join(' ').toLowerCase().includes(t));
+    const emps = scopeEmployees(u, state.employees).filter((e) => [e.id, e.id.replace(' ', ''), e.code, e.name, e.designation, ...(limited ? [] : [e.molId, e.nationality, e.mobile])].join(' ').toLowerCase().includes(t));
     const assets = scopeAssets(u, state.assets).filter((a) => [a.id, a.plate, a.vin, a.make, a.model, a.body].join(' ').toLowerCase().includes(t));
     const docs = [];
     scopeEmployees(u, state.employees).forEach((e) => e.docs.forEach((d) => { if (canSeeDoc(u, d.type) && [d.ref, d.type].join(' ').toLowerCase().includes(t) && (d.ref || '').toLowerCase().includes(t)) docs.push({ module: 'hr', owner: e, doc: d }); }));

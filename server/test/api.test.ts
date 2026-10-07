@@ -253,19 +253,24 @@ test('audit trail is append-only in the database', async () => {
 // ---------- migration import (§16) ----------
 test('import: validate reports accepted and rejected rows; commit imports only valid rows', async () => {
   const csv = [
-    'name,department,designation,company,sponsor,dob,joined,passport_no,passport_expiry',
-    'Import One,Trading Department,Salesman,Adroit Building Materials Trading Ent. L.L.C,Adroit Building Materials Trading Ent. L.L.C,15/03/1990,2020-01-01,N1111111,2030-01-01',
-    'Import Two,Nowhere Department,Salesman,Adroit Building Materials Trading Ent. L.L.C,Adroit Building Materials Trading Ent. L.L.C,1991-01-01,2020-01-01,,',
+    'emp_no,emp_code,mol_id,name,department,designation,company,sponsor,dob,joined,passport_no,passport_expiry',
+    'IMP 0001,STF,90000000000001,Import One,Trading Department,Salesman,Adroit Building Materials Trading Ent. L.L.C,Adroit Building Materials Trading Ent. L.L.C,15/03/1990,01/01/2020,N1111111,01/01/2030',
+    'IMP 0002,,,Import Two,Nowhere Department,Salesman,Adroit Building Materials Trading Ent. L.L.C,Adroit Building Materials Trading Ent. L.L.C,01/01/1991,01/01/2020,,',
+    ',,,Import Three,Trading Department,Salesman,Adroit Building Materials Trading Ent. L.L.C,Adroit Building Materials Trading Ent. L.L.C,31/02/1991,01/01/2020,,',
   ].join('\n');
   const send = async (mode: string) => {
     const m = multipart({}, { name: 'emps.csv', content: Buffer.from(csv), type: 'text/csv' });
     return app.inject({ method: 'POST', url: `/api/import/employees?mode=${mode}`, headers: { ...H, cookie: cookies.hr, ...m.headers }, payload: m.payload });
   };
   const v = (await send('validate')).json();
-  assert.equal(v.accepted, 1); assert.equal(v.rejected, 1);
+  assert.equal(v.accepted, 1); assert.equal(v.rejected, 2);
   assert.match(v.log[1].errors.join(' '), /department/);
+  assert.match(v.log[2].errors.join(' '), /emp_no is required/);
+  assert.match(v.log[2].errors.join(' '), /31\/02\/1991/, 'impossible date rejected');
   const c = (await send('commit')).json();
   assert.equal(c.created.length, 1);
+  const imported = (await req('GET', '/api/employees/IMP%200001', 'hr')).body;
+  assert.equal(imported.code, 'STF'); assert.equal(imported.molId, '90000000000001'); assert.equal(imported.dob, '1990-03-15');
   const again = (await send('validate')).json();
   assert.equal(again.accepted, 0, 'duplicate detected on re-import');
   const fleetTry = multipart({}, { name: 'e.csv', content: Buffer.from(csv) });
@@ -283,4 +288,67 @@ test('record cache: changes from this or another app instance are visible on the
   await pool.query('UPDATE employees SET name = $1 WHERE emp_no = $2', [original, 'EMP 0115']);
   const back = await req('GET', '/api/employees', 'hr');
   assert.ok(back.body.items.some((e: any) => e.name === original));
+});
+
+// ---------- Changes Report 01 ----------
+test('CR01: employee number and code are entered by the user; numbers and MOL IDs are unique', async () => {
+  const base = { name: 'Manual Number Person', department: 'Trading Department', designation: 'Salesman', joined: '2026-01-10',
+    company: 'Adroit Building Materials Trading Ent. L.L.C', sponsor: 'Adroit Building Materials Trading Ent. L.L.C' };
+  const noNumber = await req('POST', '/api/employees', 'hr', base);
+  assert.equal(noNumber.status, 400, 'the employee number is required');
+  const r = await req('POST', '/api/employees', 'hr', { ...base, empNo: 'ADR-7001', empCode: 'STF', molId: '81234567890123' });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.id, 'ADR-7001'); assert.equal(r.body.code, 'STF'); assert.equal(r.body.molId, '81234567890123');
+  const dupNo = await req('POST', '/api/employees', 'hr', { ...base, name: 'Another Person', empNo: 'adr-7001' });
+  assert.equal(dupNo.status, 409); assert.match(dupNo.body.message || dupNo.body.error || '', /already exists/);
+  const dupMol = await req('POST', '/api/employees', 'hr', { ...base, name: 'Third Person', empNo: 'ADR-7002', molId: '81234567890123' });
+  assert.equal(dupMol.status, 409, 'Emp (MOL) ID is unique');
+  // the number is fixed after creation; the code can be edited
+  const put = await req('PUT', '/api/employees/ADR-7001', 'hr', { ...base, empNo: 'CHANGED', empCode: 'LAB', molId: '81234567890123' });
+  assert.equal(put.status, 200); assert.equal(put.body.id, 'ADR-7001'); assert.equal(put.body.code, 'LAB');
+});
+
+test('CR01: MOL register: company MOL codes and Emp (MOL) IDs', async () => {
+  const cfg = (await req('GET', '/api/bootstrap', 'hr')).body.config;
+  const [a, b] = cfg.companies;
+  const set = await req('PUT', `/api/companies/${a.id}/mol`, 'hr', { molCode: 'MOL-TEST-1' });
+  assert.equal(set.status, 200);
+  assert.equal(set.body.companies.find((c: any) => c.id === a.id).molCode, 'MOL-TEST-1');
+  assert.equal((await req('PUT', `/api/companies/${b.id}/mol`, 'hr', { molCode: 'mol-test-1' })).status, 409, 'each company has its own MOL code');
+  assert.equal((await req('PUT', `/api/companies/${a.id}/mol`, 'fleet', { molCode: 'X' })).status, 403);
+  assert.equal((await req('PUT', `/api/companies/${a.id}/mol`, 'dh', { molCode: 'X' })).status, 403);
+  const e = await req('PUT', '/api/employees/EMP%200115/mol', 'hr', { molId: '70000000000115' });
+  assert.equal(e.status, 200); assert.equal(e.body.molId, '70000000000115');
+  assert.equal((await req('PUT', '/api/employees/EMP%200116/mol', 'hr', { molId: '70000000000115' })).status, 409);
+  assert.equal((await req('PUT', '/api/employees/EMP%200115/mol', 'pro', { molId: '1' })).status, 403, 'only HR edits');
+  const dh = await req('GET', '/api/bootstrap', 'dh');
+  assert.ok(dh.body.employees.every((x: any) => x.molId === null), 'department heads do not see MOL IDs');
+  const audit = await req('GET', '/api/audit?q=MOL', 'aud');
+  assert.ok(audit.body.total >= 2, 'MOL changes are audited');
+});
+
+test('CR01: Labour Card is an HR document type handled by PRO, with expiry tracking', async () => {
+  const cfg = (await req('GET', '/api/bootstrap', 'hr')).body.config;
+  const lc = cfg.docTypes.find((t: any) => t.key === 'Labour Card');
+  assert.ok(lc && lc.module === 'hr' && lc.expires);
+  const emp = (await req('GET', '/api/employees/EMP%200115', 'hr')).body;
+  assert.ok(emp.docs.some((d: any) => d.type === 'Labour Card'), 'demo employees have a labour card');
+  const m = multipart({ mode: 'upload', ref: '12345678', expiry: '2030-01-01' }, { name: 'lc.pdf', content: PDF });
+  const r = await app.inject({ method: 'POST', url: '/api/documents/hr/EMP%200001/Labour%20Card', headers: { ...H, cookie: cookies.pro, ...m.headers }, payload: m.payload });
+  assert.equal(r.statusCode, 200, r.body);
+  const ins = multipart({ mode: 'upload', ref: '1', expiry: '2030-01-01' });
+  const r2 = await app.inject({ method: 'POST', url: '/api/documents/hr/EMP%200001/Labour%20Card', headers: { ...H, cookie: cookies.ins, ...ins.headers }, payload: ins.payload });
+  assert.equal(r2.statusCode, 403, 'insurance officer cannot change labour cards');
+});
+
+test('CR01: dates are shown as dd/mm/yyyy', async () => {
+  const { fmt, dmyToIso, isoToDmy } = await import('@adroit/core/src/core/shared.js');
+  assert.equal(fmt('2026-10-07'), '07/10/2026');
+  assert.equal(fmt(null), '—');
+  assert.equal(isoToDmy('2026-01-05'), '05/01/2026');
+  assert.equal(dmyToIso('5/1/2026'), '2026-01-05');
+  assert.equal(dmyToIso('29/02/2027'), null);
+  assert.equal(dmyToIso(''), '');
+  const leave = await req('GET', '/api/audit?q=Leave', 'aud');
+  assert.ok(!leave.body.items.some((x: any) => /\b\d{4}-\d{2}-\d{2}\b/.test(x.detail || '') && /→/.test(x.detail)), 'audit text uses dd/mm/yyyy');
 });

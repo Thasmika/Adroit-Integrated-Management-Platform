@@ -116,6 +116,9 @@ export function StoreProvider({ children }) {
     actionHistory: (module, no, type) => api('GET', `/api/documents/${module}/${enc(no)}/${enc(type)}/actions`),
     // administration
     async docType(key, p) { setCfg(await api('PUT', `/api/admin/doc-types/${enc(key)}`, p)); },
+    // MOL register (Changes Report 01)
+    async saveEmployeeMol(no, molId) { const e = await api('PUT', `/api/employees/${enc(no)}/mol`, { molId }); patch('employees', e); return e; },
+    async saveCompanyMol(id, molCode) { const c = await api('PUT', `/api/companies/${enc(id)}/mol`, { molCode }); setCfg(c); return c; },
     async listAdd(list, item) { setCfg(await api('POST', `/api/admin/lists/${list}`, item)); },
     async listUpdate(list, key, p) { setCfg(await api('PUT', `/api/admin/lists/${list}/${enc(key)}`, p)); },
     async userAdd(u) { const r = await api('POST', '/api/admin/users', u); setCfg(r.config); return r; },

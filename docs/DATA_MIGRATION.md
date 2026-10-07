@@ -19,12 +19,13 @@ How to load the existing employee and fleet records into the platform (technical
 
 ## Employee template columns
 
-`emp_no, name, gender, nationality, dob, department, location, designation, mobile, email, status, joined, company, sponsor, dept_head, insurance_plan, insurance_provider, emergency_contact, home_address, passport_no, passport_issued, passport_expiry, visa_no, visa_issued, visa_expiry, eid_no, eid_issued, eid_expiry, insurance_no, insurance_expiry`
+`emp_no, emp_code, mol_id, name, gender, nationality, dob, department, location, designation, mobile, email, status, joined, company, sponsor, dept_head, insurance_plan, insurance_provider, emergency_contact, home_address, passport_no, passport_issued, passport_expiry, visa_no, visa_issued, visa_expiry, eid_no, eid_issued, eid_expiry, labour_card_no, labour_card_issued, labour_card_expiry, insurance_no, insurance_expiry`
 
 - Required: `name, department, designation, company, sponsor`.
-- `emp_no`: leave empty to have the next number assigned (`EMP 0001` …), or give the existing number to keep it.
+- `emp_no`: required. Employee numbers are entered by HR, not generated; each must be unique.
+- `emp_code`: optional employee code. `mol_id`: optional Emp (MOL) ID, unique per employee.
 - `company` is the operational company; `sponsor` is the visa-sponsoring company. Both must match a company name in Administration.
-- Dates: `YYYY-MM-DD` or `DD/MM/YYYY`.
+- Dates: `DD/MM/YYYY` (the system standard). Older files in `YYYY-MM-DD` are still accepted.
 - A document expiry without its number is rejected.
 
 ## Asset template columns

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../core/store.jsx';
-import { ROLES, FLEET_CATEGORIES, STATUS_LABEL, ACTION_STATES } from '../core/shared.js';
+import { ROLES, FLEET_CATEGORIES, STATUS_LABEL, ACTION_STATES, fmt } from '../core/shared.js';
 import { Tabs, Icon, Avatar, Field } from '../core/ui.jsx';
 import { HR_STATUSES } from '../hr/data.js';
 import { STATUSES as ASSET_STATUSES } from '../fleet/data.js';
@@ -94,7 +94,7 @@ export default function Admin({ initialTab }) {
 
       {tab === 'masters' && (
         <div className="grid-3">
-          <MasterList title="Group companies" items={cfg.companies} render={(c) => <><strong>{c.name}</strong><small className="muted">{c.id} · {c.kind}</small></>}
+          <MasterList title="Group companies" items={cfg.companies} render={(c) => <><strong>{c.name}</strong><small className="muted">{c.id} · {c.kind}{c.molCode ? ` · MOL code ${c.molCode}` : " · MOL code not set"}</small></>}
             onToggle={(c) => list('companies', { ...c, active: !c.active }, `${c.short} ${c.active ? 'deactivated' : 'activated'}`)}
             onAdd={(name) => list('companies', { name, short: name.replace(/ L\.?L\.?C\.?$/i, ''), kind: 'Group company' }, `${name} added`)} addLabel="Company legal name" />
           <MasterList title="Departments" items={cfg.departments} render={(d) => <><strong>{d.name}</strong><small className="muted">{d.id} · {state.employees.filter((e) => e.department === d.name).length} employees · {state.assets.filter((a) => a.department === d.name).length} assets</small></>}
@@ -219,7 +219,7 @@ function Users() {
               <td className="small mono">{x.email}</td>
               <td><select id={'role-' + x.id} value={x.role} disabled={x.id === state.user.id} onChange={(e) => save({ ...x, role: e.target.value, scope: e.target.value === 'depthead' ? x.scope || cfg.departments[0].name : null }, `${x.name} is now ${ROLES[e.target.value].label}`)} aria-label="Role">{Object.entries(ROLES).map(([k, r]) => <option key={k} value={k}>{r.label}</option>)}</select></td>
               <td>{x.role === 'depthead' ? <select id={'scope-' + x.id} value={x.scope || ''} onChange={(e) => save({ ...x, scope: e.target.value }, 'Scope updated')} aria-label="Department scope">{cfg.departments.map((d) => <option key={d.id}>{d.name}</option>)}</select> : <span className="muted small">All permitted records</span>}</td>
-              <td className="small">{x.last_login_at ? new Date(x.last_login_at).toLocaleDateString('en-GB') : <span className="muted">never</span>}{x.must_change_password && <span className="block muted">must change password</span>}</td>
+              <td className="small">{x.last_login_at ? fmt(new Date(x.last_login_at)) : <span className="muted">never</span>}{x.must_change_password && <span className="block muted">must change password</span>}</td>
               <td className="right nowrap">
                 <button className="btn btn-sm btn-ghost" disabled={x.id === state.user.id} onClick={() => reset(x)}>Reset password</button>
                 <button className="btn btn-sm btn-ghost" disabled={x.id === state.user.id} onClick={() => save({ ...x, active: !x.active }, `${x.name} ${x.active ? 'deactivated' : 'activated'}`)}>{x.active ? 'Deactivate' : 'Activate'}</button>

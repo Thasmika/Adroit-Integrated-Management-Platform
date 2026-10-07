@@ -21,6 +21,7 @@ import EmployeeForm from './hr/EmployeeForm.jsx';
 import HrDocuments from './hr/Documents.jsx';
 import Leave from './hr/Leave.jsx';
 import HrReports from './hr/Reports.jsx';
+import MolRegister from './hr/MolRegister.jsx';
 import FleetDashboard from './fleet/Dashboard.jsx';
 import Fleet from './fleet/Fleet.jsx';
 import VehicleProfile from './fleet/VehicleProfile.jsx';
@@ -47,7 +48,7 @@ function Shell() {
 
   const P = route.page;
   const group = P.startsWith('hr-') ? 'hr' : P.startsWith('fleet-') ? 'fleet' : P;
-  const hrBlocked = u.role !== 'sysadmin' && ((P === 'hr-documents' && ROLES[u.role].noDocs) || (P === 'hr-reports' && !['hr', 'management', 'auditor'].includes(u.role)) || (['hr-new', 'hr-edit', 'hr-import'].includes(P) && u.role !== 'hr'));
+  const hrBlocked = u.role !== 'sysadmin' && (((P === 'hr-documents' || P === 'hr-mol') && ROLES[u.role].noDocs) || (P === 'hr-reports' && !['hr', 'management', 'auditor'].includes(u.role)) || (['hr-new', 'hr-edit', 'hr-import'].includes(P) && u.role !== 'hr'));
   const flBlocked = u.role !== 'sysadmin' && ((P === 'fleet-reports' && !['fleet', 'management', 'auditor'].includes(u.role)) || (['fleet-new', 'fleet-edit', 'fleet-import'].includes(P) && u.role !== 'fleet'));
   const allowed = (P.startsWith('hr-') && hr && !hrBlocked) || (P.startsWith('fleet-') && fl && !flBlocked) ||  ['home', 'attention', 'search', 'assistant', 'notifications', 'account'].includes(P) || (P === 'admin' && canAdmin(u)) || (P === 'audit' && canAudit(u));
   const NAV = [
@@ -63,6 +64,7 @@ function Shell() {
       { key: 'hr-employees', label: 'Employees', icon: 'people', match: ['hr-employee', 'hr-new', 'hr-edit', 'hr-import'] },
       !ROLES[u.role].noDocs && { key: 'hr-documents', label: 'Documents & Expiry', icon: 'docs', badge: hrUrgent },
       { key: 'hr-leave', label: 'Leave & Rejoining', icon: 'leave', badge: pendingLeave },
+      !ROLES[u.role].noDocs && { key: 'hr-mol', label: 'MOL Register', icon: 'idcard' },
       ['hr', 'management', 'auditor'].includes(u.role) && { key: 'hr-reports', label: 'HR Reports', icon: 'reports' },
     ] },
     fl && { title: 'Vehicle & Equipment', items: [
@@ -97,6 +99,7 @@ function Shell() {
     case 'hr-documents': page = <HrDocuments initialTab={route.param} />; break;
     case 'hr-leave': page = <Leave initialTab={route.param} />; break;
     case 'hr-reports': page = <HrReports />; break;
+    case 'hr-mol': page = <MolRegister />; break;
     case 'fleet-dashboard': page = <FleetDashboard />; break;
     case 'fleet-master': page = <Fleet initialCat={route.param} />; break;
     case 'fleet-vehicle': page = <VehicleProfile param={route.param} />; break;

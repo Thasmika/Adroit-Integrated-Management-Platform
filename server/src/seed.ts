@@ -8,7 +8,7 @@ import { pool, tx, q, one } from './db.js';
 import { env } from './env.js';
 import { loadConfig, SYSTEM_DEFAULTS } from './config.js';
 import { hashPassword } from './auth.js';
-import { COMPANIES_INIT, DEPARTMENTS_INIT, LOCATIONS_INIT, USERS_INIT, DOC_TYPES_INIT, DEFAULT_CATEGORIES, TODAY, iso, addDays } from '@adroit/core/src/core/shared.js';
+import { COMPANIES_INIT, DEPARTMENTS_INIT, LOCATIONS_INIT, USERS_INIT, DOC_TYPES_INIT, DEFAULT_CATEGORIES, TODAY, iso, addDays, fmt } from '@adroit/core/src/core/shared.js';
 
 const TEMPLATES = [
   ['T1', 'Document entering warning window', 'Responsible officer', '{docType} for {owner} expires on {expiry}', 'In-app + email'],
@@ -23,7 +23,7 @@ export const DEMO_PASSWORD = 'Adroit@2026';
 
 async function seedMasters(c: any, demo: boolean) {
   const companies = demo ? COMPANIES_INIT : COMPANIES_INIT.slice(0, 1);
-  for (const x of companies) await c.query('INSERT INTO companies (id, name, short, kind, active) VALUES ($1,$2,$3,$4,true) ON CONFLICT DO NOTHING', [x.id, x.name, x.short, x.kind]);
+  for (const x of companies) await c.query('INSERT INTO companies (id, name, short, kind, active, mol_code) VALUES ($1,$2,$3,$4,true,$5) ON CONFLICT DO NOTHING', [x.id, x.name, x.short, x.kind, demo ? (x as any).molCode || null : null]);
   for (const x of DEPARTMENTS_INIT) await c.query('INSERT INTO departments (id, name) VALUES ($1,$2) ON CONFLICT DO NOTHING', [x.id, x.name]);
   for (const x of LOCATIONS_INIT) await c.query('INSERT INTO locations (id, name) VALUES ($1,$2) ON CONFLICT DO NOTHING', [x.id, x.name]);
   for (const [i, n] of DEFAULT_CATEGORIES.entries()) await c.query('INSERT INTO asset_categories (name, sort) VALUES ($1,$2) ON CONFLICT DO NOTHING', [n, i]);
@@ -97,7 +97,7 @@ async function insertDocs(c: any, module: 'hr' | 'fleet', ownerUid: string, owne
     const docId = crypto.randomUUID();
     await c.query('INSERT INTO documents (id, owner_module, owner_id, type, name) VALUES ($1,$2,$3,$4,$5)', [docId, module, ownerUid, d.type, d.name || d.type]);
     for (const h of [...(d.history || [])].reverse()) {
-      const fid = await writeSample(c, { module, id: ownerUid }, h.file, [`${d.name || d.type} (previous version)`, `${ownerNo}  ${ownerName}`, `Ref: ${h.ref}`, `Issued: ${h.issued}   Expiry: ${h.expiry}`]);
+      const fid = await writeSample(c, { module, id: ownerUid }, h.file, [`${d.name || d.type} (previous version)`, `${ownerNo}  ${ownerName}`, `Ref: ${h.ref}`, `Issued: ${fmt(h.issued)}   Expiry: ${fmt(h.expiry)}`]);
       await c.query(`INSERT INTO document_versions (document_id, ref, issuer, issued, expiry, file_id, is_current, created_by, created_at, superseded_at, superseded_by)
                      VALUES ($1,$2,$3,$4,$5,$6,false,'Data migration',$7,$8,'Data migration')`,
         [docId, h.ref, d.issuer || null, h.issued || null, h.expiry || null, fid, h.issued || iso(TODAY), h.replacedOn]);
@@ -150,11 +150,11 @@ export async function seedDemo(opts: { reset?: boolean } = {}, log = console.log
     for (const e of hr.employees) {
       const uid = crypto.randomUUID();
       empUid.set(e.id, uid);
-      await c.query(`INSERT INTO employees (id, emp_no, name, gender, nationality, dob, department, location, designation, mobile, email, status, joined,
+      await c.query(`INSERT INTO employees (id, emp_no, emp_code, mol_id, name, gender, nationality, dob, department, location, designation, mobile, email, status, joined,
           company, sponsor, dept_head, insurance_plan, insurance_provider, emergency_contact, home_address, notes, created_by, created_at, updated_by, updated_at)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'Data migration',$22,'Data migration',$22)`,
+          VALUES ($1,$2,$23,$24,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'Data migration',$22,'Data migration',$22)`,
         [uid, e.id, e.name, e.gender, e.nationality, e.dob, e.department, e.location, e.designation, e.mobile, e.email || null, e.status, e.joined,
-          e.company, e.sponsor, e.deptHead, e.insurancePlan, e.insuranceProvider, e.emergencyContact, e.homeAddress || null, e.notes || null, e.created.at]);
+          e.company, e.sponsor, e.deptHead, e.insurancePlan, e.insuranceProvider, e.emergencyContact, e.homeAddress || null, e.notes || null, e.created.at, e.code || null, e.molId || null]);
       await insertDocs(c, 'hr', uid, e.id, e.name, e.docs, userByName);
     }
     for (const a of fleet.assets) {

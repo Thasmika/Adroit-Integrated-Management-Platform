@@ -32,7 +32,9 @@ When a document enters its warning window, a renewal action opens (**Open**) and
 
 ## HR Officer
 
-- **Employees**: add, edit, and import from CSV. Each employee has one profile with tabs for Personal, Employment, Passport, Visa, Emirates ID, Insurance, Documents and Leave.
+- **Employees**: add, edit, and import from CSV. When adding an employee, enter the **employee number** (it must be unique and cannot be changed later), the **employee code** and the **Emp (MOL) ID**. Filter the list by department, company, sponsor, employee code, nationality and status. Each employee has one profile with tabs for Personal, Employment, Passport, Visa, Emirates ID, Labour Card, Insurance, Documents and Leave.
+- **MOL Register**: two tables, Company Name → MOL Code and Employee Name → Emp (MOL) ID. HR records or corrects the codes in place; each code must be unique.
+- **Dates** are shown and entered as dd/mm/yyyy everywhere. Type the date, or pick it with the calendar button in the field.
 - **HR Documents & Expiry**: the expiry centre, what's assigned to you, the document library, and missing documents.
 - **Leave & Rejoining**:
   - submit requests;

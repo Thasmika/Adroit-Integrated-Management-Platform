@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useStore } from '../core/store.jsx';
-import { Modal, Field } from '../core/ui.jsx';
+import { Modal, Field, DateInput } from '../core/ui.jsx';
 import { iso, TODAY } from '../core/shared.js';
 import { scopeEmployees } from '../core/access.js';
 import { LEAVE_TYPES, leaveTaken } from './data.js';
@@ -54,8 +54,8 @@ export default function ApplyLeaveModal({ emp: fixedEmp, onClose }) {
           </>
         )}
         <Field label="Leave type" span={2}><div className="seg">{LEAVE_TYPES.map((t) => <button type="button" key={t} className={type === t ? 'on' : ''} onClick={() => setType(t)}>{t}</button>)}</div></Field>
-        <Field label="From"><input id="lv-start" type="date" value={start} onChange={(e) => setStart(e.target.value)} /></Field>
-        <Field label="To (last day of leave)"><input id="lv-end" type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></Field>
+        <Field label="From"><DateInput id="lv-start" value={start} onChange={(e) => setStart(e.target.value)} /></Field>
+        <Field label="To (last day of leave)"><DateInput id="lv-end" value={end} onChange={(e) => setEnd(e.target.value)} /></Field>
         <div className="calc span-2">
           <span><strong>{Math.max(0, days)}</strong> calendar days</span>
           {emp && type === 'Annual Leave' && <span>Annual leave already taken in {TODAY.getFullYear()}: <strong>{leaveTaken(state.leaves, emp)}</strong> days</span>}

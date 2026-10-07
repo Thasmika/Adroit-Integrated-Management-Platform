@@ -3,7 +3,8 @@ import { TODAY, iso, addDays, daysUntil, prng, deptLocation, DEPARTMENTS_INIT, C
 
 export const DEPARTMENTS = DEPARTMENTS_INIT.map((d) => d.name);
 export const LEAVE_TYPES = ['Annual Leave', 'Emergency Leave', 'Sick Leave'];
-export const HR_STATUSES = ['Active', 'On Notice', 'Inactive', 'Resigned', 'Terminated'];
+// 'On Notice' removed from the choices (Changes Report 01, item 5); older records keep their value until edited
+export const HR_STATUSES = ['Active', 'Inactive', 'Resigned', 'Terminated'];
 const INSURERS = ['Daman', 'AXA Gulf', 'Oman Insurance', 'Sukoon Insurance'];
 
 const FIRST = {
@@ -43,7 +44,9 @@ const NAT_W = [['Indian', 30], ['Pakistani', 16], ['Sri Lankan', 12], ['Filipino
 const yearEndDate = () => { const y = new Date(TODAY.getFullYear(), 11, 31); return daysUntil(iso(y)) < 30 ? new Date(TODAY.getFullYear() + 1, 11, 31) : y; };
 const yearEnd = () => iso(yearEndDate());
 const COUNTRY = { Indian: 'India', Pakistani: 'Pakistan', 'Sri Lankan': 'Sri Lanka', Filipino: 'Philippines', Bangladeshi: 'Bangladesh', Nepali: 'Nepal', Egyptian: 'Egypt', Jordanian: 'Jordan' };
-const CYCLE = { Passport: 3650, 'Employment Visa': 730, 'Emirates ID': 730, 'Health Insurance': 365 };
+const CYCLE = { Passport: 3650, 'Employment Visa': 730, 'Emirates ID': 730, 'Labour Card': 730, 'Health Insurance': 365 };
+// demo employee codes (entered by HR in real use)
+const codeFor = (desig) => (/driver|operator/i.test(desig) ? 'DRV' : /mechanic|technician|electrician|welder|fitter/i.test(desig) ? 'TEC' : /helper|labour|loader|cleaner|storekeeper|watchman/i.test(desig) ? 'LAB' : 'STF');
 
 export function makeHr() {
   const { rnd, pick, digits } = prng(20260929);
@@ -83,12 +86,12 @@ export function makeHr() {
     if (rnd() < 0.55) docs.push({ type: 'Qualification Certificate', name: 'Qualification Certificate', ref: `QC-${digits(5)}`, issuer: '', issued: '', expiry: '', renewal: null, history: [], file: { name: `${id.replace(' ', '')}_Qualification.pdf`, size: '410 KB', sample: true } });
     const joined = iso(addDays(TODAY, -Math.floor(rnd() * 5400) - 60));
     employees.push({
-      id, name: `${first} ${pick(LAST[n])}`, photo: null,
+      id, code: '', molId: '', name: `${first} ${pick(LAST[n])}`, photo: null,
       gender: ['Priya', 'Lakshmi', 'Nadeesha', 'Sanduni', 'Rowena', 'Maricel'].includes(first) ? 'Female' : 'Male',
       nationality: n, dob: iso(addDays(TODAY, -Math.floor((22 + rnd() * 36) * 365.25))),
       department: dept, location: deptLocation(dept, pick), designation: i === 114 ? 'IT Manager' : pick(DESIG[dept]),
       mobile: `+971 5${pick(['0', '2', '5', '6', '8'])} ${digits(3)} ${digits(4)}`, email: '',
-      status: rnd() < 0.97 ? 'Active' : 'On Notice', joined, company: OPERATING, sponsor,
+      status: rnd() < 0.97 ? 'Active' : 'Inactive', joined, company: OPERATING, sponsor,
       deptHead: '', insurancePlan: 'Group Health Insurance', insuranceProvider: provider,
       emergencyContact: `+${pick(['91', '92', '94', '63', '880', '977', '20', '962'])} ${digits(9)}`, homeAddress: '', notes: '',
       created: { by: 'Data migration', at: iso(addDays(TODAY, -28)) }, updated: { by: 'Data migration', at: iso(addDays(TODAY, -28)) },
@@ -108,6 +111,18 @@ export function makeHr() {
   // a few more renewals already moving
   employees.forEach((x) => x.docs.forEach((d) => { if (!d.renewal && d.expiry && daysUntil(d.expiry) <= 20 && rnd() < 0.45) d.renewal = { status: 'In Progress', note: 'Renewal application started', by: 'Imran Qureshi', date: iso(addDays(TODAY, -4)) }; }));
   const leaves = makeLeaves(employees, rnd);
+  // Changes Report 01: employee code, Emp (MOL) ID and labour card (separate random stream so the rest of the demo data is unchanged)
+  const lc = prng(20261007);
+  employees.forEach((x) => {
+    x.code = codeFor(x.designation);
+    x.molId = `${1 + Math.floor(lc.rnd() * 9)}${lc.digits(13)}`;
+    const visa = x.docs.find((d) => d.type === 'Employment Visa');
+    const noScan = lc.rnd() < 0.02;
+    x.docs.splice(3, 0, {
+      type: 'Labour Card', name: 'Labour Card', ref: lc.digits(8), issuer: 'MOHRE', issued: visa.issued, expiry: visa.expiry, renewal: null,
+      file: noScan ? null : { name: `${x.id.replace(' ', '')}_Labour_Card.pdf`, size: `${150 + Math.floor(lc.rnd() * 300)} KB`, sample: true }, history: [],
+    });
+  });
   // give the sample Department Head (Trading) one request in the HR queue
   const busy = new Set(leaves.filter((l) => !['Completed', 'Rejected'].includes(l.status)).map((l) => l.empId));
   const tr = employees.find((x) => x.department === 'Trading Department' && x.status === 'Active' && !busy.has(x.id));
@@ -171,13 +186,18 @@ export function hrMissing(e) {
     .concat(e.docs.filter((d) => req.includes(d.type) && !d.file).map((d) => ({ type: d.type, recorded: true, doc: d })));
 }
 export function leaveTaken(leaves, emp) {
-  return leaves.filter((l) => l.empId === emp.id && l.type === 'Annual Leave' && ['Completed', 'On Leave', 'Awaiting Rejoining'].includes(l.status) && l.start >= `${TODAY.getFullYear()}-01-01`).reduce((s, l) => s + l.days, 0);
+  return leaves.filter((l) => l.empId === emp.id && l.type === 'Annual Leave' && ['Completed', 'On Leave', 'Awaiting Rejoining'].includes(l.status)).reduce((s, l) => s + l.days, 0);
 }
 export const maskNo = (no, type) => {
   if (!no) return '—';
-  if (type === 'Emirates ID') return no.slice(0, 4) + '••••-•••••' + no.slice(-3);
-  if (type === 'Health Insurance' || type === 'Qualification Certificate') return no;
-  return no.slice(0, 1) + '•'.repeat(Math.max(0, no.length - 4)) + no.slice(-3);
+  return no;
 };
-export const empParam = (id) => id.replace('EMP ', '');
-export const empIdFromParam = (p) => `EMP ${p}`;
+// Employee number ↔ page-link parameter. Employee numbers are entered by HR (Changes Report 01), so they can have any form.
+// Numbers like 'EMP 0115' keep the short link '#hr-employee.0115'; any other number is percent-encoded after '~'.
+export const empParam = (id) => (/^EMP \d+$/.test(id) ? id.slice(4) : '~' + encodeURIComponent(id).replace(/\./g, '%2E'));
+export const empIdFromParam = (p) => {
+  const s = String(p || '');
+  const dec = (x) => { try { return decodeURIComponent(x); } catch { return x; } };
+  if (s.startsWith('~')) return dec(s.slice(1));
+  return /^\d+$/.test(s) ? `EMP ${s}` : dec(s);
+};

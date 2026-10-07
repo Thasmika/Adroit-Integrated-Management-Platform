@@ -7,7 +7,20 @@ export const refreshToday = () => { TODAY = startOfDay(new Date()); return TODAY
 export const iso = (d) => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
 export const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 export const daysUntil = (d) => (d ? Math.round((new Date(String(d).slice(0, 10) + 'T00:00:00') - refreshToday()) / 864e5) : null);
-export const fmt = (d) => (d ? new Date(String(d).slice(0, 10) + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
+// Standard date format for the whole system: dd/mm/yyyy (Changes Report 01, item 3). Dates are stored as ISO yyyy-mm-dd.
+export const isoToDmy = (d) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d || '')); return m ? `${m[3]}/${m[2]}/${m[1]}` : ''; };
+// dd/mm/yyyy (also d/m/yyyy, dd-mm-yyyy, dd.mm.yyyy) → yyyy-mm-dd; '' for empty; null when not a real date
+export const dmyToIso = (t) => {
+  const v = String(t || '').trim();
+  if (!v) return '';
+  const m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(v);
+  if (!m) return null;
+  const [dd, mm, yy] = [+m[1], +m[2], +m[3]];
+  const x = new Date(Date.UTC(yy, mm - 1, dd));
+  if (x.getUTCFullYear() !== yy || x.getUTCMonth() !== mm - 1 || x.getUTCDate() !== dd) return null;
+  return `${yy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+};
+export const fmt = (d) => (d ? isoToDmy(typeof d === 'string' ? d : iso(d)) || '—' : '—');
 export const fmtStamp = (ts) => (ts ? new Date(ts).toLocaleString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—');
 export const NOW_STAMP = () => iso(new Date()) + ' ' + new Date().toTimeString().slice(0, 5);
 
@@ -19,11 +32,18 @@ export function prng(seed) {
 
 // ---------- reference masters (§5) ----------
 export const COMPANIES_INIT = [
-  { id: 'ABM', name: 'Adroit Building Materials Trading Ent. L.L.C', short: 'Adroit', kind: 'Operating company', active: true },
-  { id: 'GGT', name: 'Gateway Gulf Transport L.L.C', short: 'Gateway Gulf Transport', kind: 'Group company', active: true },
-  { id: 'AGT', name: 'Adroit General Trading L.L.C', short: 'Adroit General Trading', kind: 'Group company', active: true },
-  { id: 'ATS', name: 'Adroit Technical Services L.L.C', short: 'Adroit Technical Services', kind: 'Group company', active: true },
-];
+  'Adroit Building Materials Trading Ent. L.L.C',
+  'Gateway Gulf Transport L.L.C',
+  'Adroit General Trading L.L.C',
+  'Adroit Technical Services L.L.C'
+].map((name, i) => ({ 
+  id: 'C' + String(i + 1).padStart(2, '0'), 
+  name, 
+  short: name.replace(' L.L.C', '').replace(' Ent.', ''), 
+  kind: 'Operating company', 
+  active: true, 
+  molCode: '11000' + i 
+}));
 export const OPERATING = COMPANIES_INIT[0].name;
 export const DEPARTMENTS_INIT = [
   'Administrative Department', 'Trading Department', 'Transport Department', 'Transport & Trading Department', 'Satwa Branch',
@@ -42,7 +62,7 @@ export const ROLES = {
   sysadmin: { label: 'System Administrator', modules: ['hr', 'fleet'], admin: true, audit: true, note: 'User/role setup, masters and configuration. Has full access to all modules and content.' },
   management: { label: 'Management', modules: ['hr', 'fleet'], audit: true, readOnly: true, note: 'Integrated dashboards and summaries across companies; approves leave.' },
   hr: { label: 'HR Officer', modules: ['hr'], note: 'Employee records, HR documents, leave review, expiry follow-up.' },
-  pro: { label: 'PRO / Compliance Officer', modules: ['hr'], docTypes: ['Passport', 'Employment Visa', 'Emirates ID'], note: 'Assigned visa / EID / passport renewals.' },
+  pro: { label: 'PRO / Compliance Officer', modules: ['hr'], docTypes: ['Passport', 'Employment Visa', 'Emirates ID', 'Labour Card'], note: 'Assigned visa / EID / passport / labour card renewals.' },
   insurance: { label: 'Insurance Officer', modules: ['hr', 'fleet'], docTypes: ['Health Insurance', 'Motor Insurance'], note: 'Employee and fleet insurance records and their expiry actions.' },
   depthead: { label: 'Department Head', modules: ['hr'], scoped: true, noDocs: true, note: 'Submits leave and records rejoining for own department; limited profile view.' },
   fleet: { label: 'Fleet / Transport Officer', modules: ['fleet'], note: 'Fleet master, vehicle documents, compliance action tracking.' },
@@ -66,8 +86,12 @@ export const DEFAULT_CATEGORIES = ['Heavy Vehicle', 'Light Vehicle', 'Trailer', 
 export const FLEET_CATEGORIES = [...DEFAULT_CATEGORIES];
 export const DOC_TYPES_INIT = [
   { key: 'Passport', module: 'hr', short: 'PP', expires: true, required: true, urgent: 30, due: 60, monitor: 90, officer: 'u-pro' },
+  { key: 'Passport Page 2', module: 'hr', short: 'PP2', expires: false, required: false, urgent: 0, due: 0, monitor: 0, officer: 'u-pro' },
+  { key: 'Passport Page 3', module: 'hr', short: 'PP3', expires: false, required: false, urgent: 0, due: 0, monitor: 0, officer: 'u-pro' },
   { key: 'Employment Visa', module: 'hr', short: 'VISA', expires: true, required: true, urgent: 30, due: 60, monitor: 90, officer: 'u-pro' },
   { key: 'Emirates ID', module: 'hr', short: 'EID', expires: true, required: true, urgent: 30, due: 60, monitor: 90, officer: 'u-pro' },
+  { key: 'Emirates ID Back', module: 'hr', short: 'EID2', expires: false, required: false, urgent: 0, due: 0, monitor: 0, officer: 'u-pro' },
+  { key: 'Labour Card', module: 'hr', short: 'LC', expires: true, required: false, urgent: 30, due: 60, monitor: 90, officer: 'u-pro' },
   { key: 'Health Insurance', module: 'hr', short: 'INS', expires: true, required: true, urgent: 30, due: 60, monitor: 90, officer: 'u-ins' },
   { key: 'Qualification Certificate', module: 'hr', short: 'QUAL', expires: false, required: false, urgent: 0, due: 0, monitor: 0, officer: 'u-hr' },
   { key: 'Vehicle Registration', module: 'fleet', short: 'REG', expires: true, requiredFor: ['Heavy Vehicle', 'Light Vehicle', 'Trailer', 'Other Company Vehicle'], urgent: 30, due: 60, monitor: 90, officer: 'u-trn' },

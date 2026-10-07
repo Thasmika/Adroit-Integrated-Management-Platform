@@ -51,7 +51,7 @@ async function loadDocs(module: 'hr' | 'fleet', ownerIds: string[] | null, db: D
 }
 
 export const empOut = (e: any, docs: any[]) => ({
-  id: e.emp_no, uid: e.id, name: e.name, photo: e.photo_file_id ? `/api/files/${e.photo_file_id}` : null,
+  id: e.emp_no, uid: e.id, code: e.emp_code || '', molId: e.mol_id || '', name: e.name, photo: e.photo_file_id ? `/api/files/${e.photo_file_id}` : null,
   gender: e.gender, nationality: e.nationality, dob: e.dob, department: e.department, location: e.location,
   designation: e.designation, mobile: e.mobile, email: e.email, status: e.status, joined: e.joined,
   company: e.company, sponsor: e.sponsor, deptHead: e.dept_head, insurancePlan: e.insurance_plan, insuranceProvider: e.insurance_provider,
@@ -94,7 +94,7 @@ export async function loadLeaves(opts: { ids?: string[]; empUids?: string[] } = 
 }
 
 // ---------- per-user filtering (§4.1: deny by default, sensitive employee documents hidden from other roles) ----------
-const LIMITED_FIELDS = ['gender', 'dob', 'email', 'emergencyContact', 'homeAddress', 'notes', 'insurancePlan', 'insuranceProvider'];
+const LIMITED_FIELDS = ['molId', 'gender', 'dob', 'email', 'emergencyContact', 'homeAddress', 'notes', 'insurancePlan', 'insuranceProvider'];
 export function employeeForUser(u: any, e: any) {
   const out = { ...e, docs: visibleDocs(u, e.docs) };
   if ((ROLES as any)[u.role]?.noDocs) LIMITED_FIELDS.forEach((k) => { out[k] = null; });

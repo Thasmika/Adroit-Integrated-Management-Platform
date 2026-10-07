@@ -134,6 +134,7 @@ Group companies: operating, registered and visa-sponsoring (§5).
 | `kind` | text | no | `'Group company'::text` |
 | `active` | boolean | no | `true` |
 | `created_at` | timestamp with time zone | no | `now()` |
+| `mol_code` | text | yes | unique (case-insensitive) |
 
 ## data_version
 
@@ -213,6 +214,8 @@ Employee master (§6.1).
 |---|---|---|---|
 | `id` | uuid | no | `gen_random_uuid()` |
 | `emp_no` | text | no |  |
+| `emp_code` | text | yes |  |
+| `mol_id` | text | yes | unique (case-insensitive) |
 | `name` | text | no |  |
 | `photo_file_id` | uuid | yes | → `files.id` |
 | `gender` | text | yes |  |

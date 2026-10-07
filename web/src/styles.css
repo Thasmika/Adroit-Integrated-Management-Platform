@@ -151,6 +151,14 @@ select { padding-right: 28px; }
 textarea { resize: vertical; }
 .field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .field input, .field select, .field textarea { width: 100%; }
+/* dd/mm/yyyy date field: text box + calendar button; the hidden native input only provides the picker */
+.date-input { position: relative; display: inline-flex; align-items: center; width: 100%; min-width: 0; }
+.date-input > input[type=text] { width: 100%; padding-right: 36px; font-variant-numeric: tabular-nums; }
+.date-input .date-pick { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; }
+.date-input .date-pick:hover { color: var(--ink); background: var(--line); }
+.date-input .date-native { position: absolute; right: 4px; bottom: 0; width: 28px; height: 0; padding: 0; border: 0; opacity: 0; pointer-events: none; }
+label:not(.field) .date-input { width: auto; }
+label:not(.field) .date-input > input[type=text] { width: 9.5em; }
 .field-label { font-size: .78rem; font-weight: 600; color: var(--muted); }
 .field-hint { font-size: .76rem; color: var(--muted); }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
@@ -287,11 +295,11 @@ a.who:hover strong, a.who-row:hover strong { color: var(--accent); }
 .kv { min-width: 0; }
 .kv dt { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; margin-bottom: 2px; }
 .kv dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
-.doc-panel { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 24px; }
+.doc-panel { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; }
 .doc-panel-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .doc-panel .kv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .doc-title-row { display: flex; align-items: center; gap: 12px; }
-.doc-thumb { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--line); background: var(--surface-2); border-radius: 6px; padding: 20px; cursor: pointer; text-align: center; color: var(--accent); min-height: 200px; overflow-wrap: anywhere; }
+.doc-thumb { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--line); background: var(--surface-2); border-radius: 6px; padding: 20px; cursor: pointer; text-align: center; color: var(--accent); min-height: 180px; overflow-wrap: anywhere; }
 .doc-thumb:hover:not(:disabled) { border-color: var(--accent); }
 .doc-thumb span { font-weight: 600; font-size: .85rem; color: var(--ink); }
 .doc-thumb small { color: var(--muted); }
@@ -711,3 +719,12 @@ a.kpi-num, .kpi a.kpi-num { color: inherit; text-decoration: none; }
 .import-log td { vertical-align: top; }
 .demo-accounts { font-size: .8rem; border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; background: var(--surface); }
 .demo-accounts button { border: 0; background: none; color: var(--accent); cursor: pointer; padding: 1px 0; font: inherit; text-align: left; }
+.mol-strip { margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+
+/* MOL register */
+.mol-cell { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 32px; }
+.mol-cell.editing input { width: 14em; max-width: 100%; }
+.pad-x { padding: 0 18px 12px; }
+tr.inactive td { opacity: .6; }
+
+@media print { body * { visibility: hidden; } .print-area, .print-area * { visibility: visible; } .print-area { position: absolute; left: 0; top: 0; width: 100%; border: none !important; margin: 0; padding: 0; } .no-print { display: none !important; } }

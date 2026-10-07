@@ -10,27 +10,27 @@ import { cfg } from '../config.js';
 import { EmployeeInput, createEmployee } from './hr.js';
 import { AssetInput, createAsset } from './fleet.js';
 import { saveDocument } from '../services/documents.js';
+import { dmyToIso } from '@adroit/core/src/core/shared.js';
 
 export const TEMPLATES = {
-  employees: ['emp_no', 'name', 'gender', 'nationality', 'dob', 'department', 'location', 'designation', 'mobile', 'email', 'status', 'joined', 'company', 'sponsor', 'dept_head',
+  employees: ['emp_no', 'emp_code', 'mol_id', 'name', 'gender', 'nationality', 'dob', 'department', 'location', 'designation', 'mobile', 'email', 'status', 'joined', 'company', 'sponsor', 'dept_head',
     'insurance_plan', 'insurance_provider', 'emergency_contact', 'home_address', 'passport_no', 'passport_issued', 'passport_expiry', 'visa_no', 'visa_issued', 'visa_expiry',
-    'eid_no', 'eid_issued', 'eid_expiry', 'insurance_no', 'insurance_expiry'],
+    'eid_no', 'eid_issued', 'eid_expiry', 'labour_card_no', 'labour_card_issued', 'labour_card_expiry', 'insurance_no', 'insurance_expiry'],
   assets: ['fleet_no', 'category', 'make', 'model', 'body', 'year', 'colour', 'emirate', 'plate', 'vin', 'engine', 'capacity', 'company', 'department', 'location', 'status',
     'usage', 'officer', 'acquired', 'odometer', 'remarks', 'registration_no', 'registration_expiry', 'insurance_policy', 'insurer', 'insurance_expiry', 'safety_no', 'safety_expiry',
     'inspection_no', 'inspection_expiry', 'permit_name', 'permit_no', 'permit_expiry'],
 };
-const EMP_DOCS = [['Passport', 'passport_no', 'passport_issued', 'passport_expiry'], ['Employment Visa', 'visa_no', 'visa_issued', 'visa_expiry'], ['Emirates ID', 'eid_no', 'eid_issued', 'eid_expiry'], ['Health Insurance', 'insurance_no', '', 'insurance_expiry']];
+const EMP_DOCS = [['Passport', 'passport_no', 'passport_issued', 'passport_expiry'], ['Employment Visa', 'visa_no', 'visa_issued', 'visa_expiry'], ['Emirates ID', 'eid_no', 'eid_issued', 'eid_expiry'], ['Labour Card', 'labour_card_no', 'labour_card_issued', 'labour_card_expiry'], ['Health Insurance', 'insurance_no', '', 'insurance_expiry']];
 const ASSET_DOCS = [['Vehicle Registration', 'registration_no', '', 'registration_expiry'], ['Motor Insurance', 'insurance_policy', '', 'insurance_expiry', 'insurer'],
   ['Safety Certificate', 'safety_no', '', 'safety_expiry'], ['Inspection / Test Certificate', 'inspection_no', '', 'inspection_expiry'], ['Other Permit', 'permit_no', '', 'permit_expiry', '', 'permit_name']];
 
-// accepts YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
+// system standard DD/MM/YYYY (also DD-MM-YYYY, DD.MM.YYYY); YYYY-MM-DD is still accepted for older files
 export function normDate(v: string | undefined) {
   if (!v) return '';
   const s = v.trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  const m = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
-  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
-  return 'invalid';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return dmyToIso(s.split('-').reverse().join('/')) ?? 'invalid';
+  const d = dmyToIso(s);
+  return d === null ? 'invalid' : d;
 }
 
 function refChecks(row: any, kind: 'employees' | 'assets') {
@@ -68,33 +68,38 @@ export default async function importRoutes(app: FastifyInstance) {
     try { rows = parse(text, { columns: (h: string[]) => h.map((x) => x.trim().toLowerCase()), skip_empty_lines: true, trim: true }); } catch (e) { throw bad(`The CSV could not be read: ${(e as Error).message}`); }
     if (!rows.length) throw bad('The file has no data rows.');
     if (rows.length > 5000) throw bad('Import at most 5,000 rows per file.');
-    const missingCols = ['name', 'department', 'designation', 'company', 'sponsor'].filter((c) => kind === 'employees' && !(c in rows[0]))
+    const missingCols = ['emp_no', 'name', 'department', 'designation', 'company', 'sponsor'].filter((c) => kind === 'employees' && !(c in rows[0]))
       .concat(['category', 'make', 'model', 'vin', 'company', 'department'].filter((c) => kind === 'assets' && !(c in rows[0])));
     if (missingCols.length) throw bad(`Missing required columns: ${missingCols.join(', ')}. Download the template for the expected layout.`);
 
     const log: any[] = [];
     const seen = new Set<string>();
     const existing = kind === 'employees'
-      ? await q<any>('SELECT emp_no, lower(name) AS name, dob FROM employees')
+      ? await q<any>('SELECT lower(emp_no) AS emp_no, lower(mol_id) AS mol_id, lower(name) AS name, dob FROM employees')
       : await q<any>("SELECT fleet_no, lower(vin) AS vin, lower(plate) AS plate FROM assets WHERE status <> 'Disposed'");
     const prepared: any[] = [];
     rows.forEach((r, i) => {
       const line = i + 2;
       const errs: string[] = [];
       const dateCols = Object.keys(r).filter((k) => /(dob|joined|acquired|_issued|_expiry)$/.test(k));
-      dateCols.forEach((k) => { const d = normDate(r[k]); if (d === 'invalid') errs.push(`${k} "${r[k]}" is not a date (use YYYY-MM-DD or DD/MM/YYYY)`); else r[k] = d; });
+      dateCols.forEach((k) => { const d = normDate(r[k]); if (d === 'invalid') errs.push(`${k} "${r[k]}" is not a date (use DD/MM/YYYY)`); else r[k] = d; });
       errs.push(...refChecks(r, kind));
       let input: any = null;
       if (kind === 'employees') {
-        const p = EmployeeInput.safeParse({ name: r.name, gender: r.gender, nationality: r.nationality, dob: r.dob || null, department: r.department, location: r.location || null,
+        if (!r.emp_no) errs.push('emp_no is required (employee numbers are entered, not generated)');
+        const p = EmployeeInput.safeParse({ empNo: r.emp_no || undefined, empCode: r.emp_code, molId: r.mol_id, name: r.name, gender: r.gender, nationality: r.nationality, dob: r.dob || null, department: r.department, location: r.location || null,
           designation: r.designation, mobile: r.mobile, email: r.email || null, status: r.status || 'Active', joined: r.joined || null, company: r.company, sponsor: r.sponsor,
           deptHead: r.dept_head, insurancePlan: r.insurance_plan, insuranceProvider: r.insurance_provider, emergencyContact: r.emergency_contact, homeAddress: r.home_address });
         if (!p.success) errs.push(...p.error.issues.map((x) => `${x.path.join('.')}: ${x.message}`)); else input = p.data;
         const key = `${(r.name || '').toLowerCase()}|${r.dob || ''}`;
-        if (r.emp_no && existing.some((x) => x.emp_no === r.emp_no)) errs.push(`employee number ${r.emp_no} already exists`);
+        const no = (r.emp_no || '').toLowerCase(); const mol = (r.mol_id || '').toLowerCase();
+        if (no && existing.some((x) => x.emp_no === no)) errs.push(`employee number ${r.emp_no} already exists`);
+        if (mol && existing.some((x) => x.mol_id === mol)) errs.push(`Emp (MOL) ID ${r.mol_id} already exists`);
+        if (mol && seen.has('m:' + mol)) errs.push('duplicate Emp (MOL) ID in this file');
+        if (mol) seen.add('m:' + mol);
         if (r.dob && existing.some((x) => x.name === (r.name || '').toLowerCase() && x.dob === r.dob)) errs.push('an employee with the same name and date of birth already exists');
-        if (seen.has(key) || (r.emp_no && seen.has(r.emp_no))) errs.push('duplicate row in this file');
-        seen.add(key); if (r.emp_no) seen.add(r.emp_no);
+        if (seen.has(key) || (no && seen.has('n:' + no))) errs.push('duplicate row in this file');
+        seen.add(key); if (no) seen.add('n:' + no);
         EMP_DOCS.forEach(([t, no, , ex]) => { if (r[ex] && !r[no]) errs.push(`${t}: number missing for expiry ${r[ex]}`); });
       } else {
         const p = AssetInput.safeParse({ category: r.category, make: r.make, model: r.model, body: r.body, year: r.year || null, colour: r.colour, emirate: r.emirate, plate: r.plate,

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useStore, href } from '../core/store.jsx';
 import { fmt, iso, TODAY, daysUntil } from '../core/shared.js';
 import { scopeEmployees, can } from '../core/access.js';
-import { Icon, Tabs, LeavePill, Modal, Field, Avatar, Empty } from '../core/ui.jsx';
+import { Icon, Tabs, LeavePill, Modal, Field, Avatar, Empty, DateInput } from '../core/ui.jsx';
 import ApplyLeaveModal from './ApplyLeaveModal.jsx';
 import { LEAVE_TYPES, DEPARTMENTS, leaveTaken, empParam } from './data.js';
 
@@ -188,7 +188,7 @@ function ActionModal({ leave, action, emp, onClose, onDone }) {
       footer={<><button className="btn" onClick={onClose}>Cancel</button><button className={'btn ' + (action === 'reject' ? 'btn-danger' : 'btn-primary')} form="act-form" type="submit" disabled={busy}>{action === 'reject' ? 'Reject request' : action === 'rejoin' ? 'Save rejoining' : action === 'review' ? 'Send for approval' : 'Approve'}</button></>}>
       <form id="act-form" className="form-grid" onSubmit={submit}>
         <p className="note span-2">{leave.type} · {fmt(leave.start)} to {fmt(leave.end)} · {leave.days} days</p>
-        {action === 'rejoin' && <Field label="Date employee reported back for duty"><input id="act-date" type="date" max={iso(TODAY)} min={leave.start} value={date} onChange={(e) => setDate(e.target.value)} /></Field>}
+        {action === 'rejoin' && <Field label="Date employee reported back for duty"><DateInput id="act-date" max={iso(TODAY)} min={leave.start} value={date} onChange={(e) => setDate(e.target.value)} /></Field>}
         <Field label={action === 'reject' ? 'Reason for rejection' : action === 'review' ? 'Review notes' : 'Remarks (optional)'} span={2}>
           <textarea id="act-note" rows={3} value={note} onChange={(e) => setNote(e.target.value)} required={action === 'reject'} placeholder={action === 'review' ? 'e.g. Record checked, no overlapping leave in department' : ''} />
         </Field>

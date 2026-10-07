@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../core/store.jsx';
 import { fmtStamp } from '../core/shared.js';
-import { Icon } from '../core/ui.jsx';
+import { Icon, DateInput } from '../core/ui.jsx';
 
 const PAGE = 100;
 
@@ -36,8 +36,8 @@ export default function Audit() {
           <select id="au-user" value={f.user} onChange={set('user')} aria-label="User"><option value="">All users</option>{(fc.users || []).filter(Boolean).sort().map((x) => <option key={x}>{x}</option>)}</select>
           <select id="au-act" value={f.action} onChange={set('action')} aria-label="Action"><option value="">All actions</option>{(fc.actions || []).filter(Boolean).sort().map((x) => <option key={x}>{x}</option>)}</select>
           <select id="au-ent" value={f.entity} onChange={set('entity')} aria-label="Record type"><option value="">All record types</option>{(fc.entities || []).filter(Boolean).sort().map((x) => <option key={x}>{x}</option>)}</select>
-          <label className="small muted">From <input id="au-from" type="date" value={f.from} onChange={set('from')} /></label>
-          <label className="small muted">To <input id="au-to" type="date" value={f.to} onChange={set('to')} /></label>
+          <label className="small muted">From <DateInput id="au-from" value={f.from} onChange={set('from')} /></label>
+          <label className="small muted">To <DateInput id="au-to" value={f.to} onChange={set('to')} /></label>
         </div>
         {err && <p className="error pad">{err}</p>}
         <div className="table-wrap"><table className="table">

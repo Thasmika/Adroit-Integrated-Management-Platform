@@ -35,10 +35,12 @@ JSON over HTTPS, same origin as the web app. Grouped by the service boundaries i
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/employees`, `/api/employees/:no` | List / one employee (`:no` = `EMP 0115`, URL-encoded) with permitted documents |
-| POST | `/api/employees` | Create (HR Officer) |
+| GET | `/api/employees`, `/api/employees/:no` | List / one employee (`:no` = the employee number, e.g. `EMP 0115`, URL-encoded) with permitted documents |
+| POST | `/api/employees` | Create (HR Officer). `empNo` (employee number) is required and unique; `empCode` and `molId` (Emp (MOL) ID, unique) are optional |
 | PUT | `/api/employees/:no` | Update (HR Officer); changes audited with before → after |
 | POST | `/api/employees/:no/photo` | Multipart image upload |
+| PUT | `/api/employees/:no/mol` | Set the Emp (MOL) ID `{ molId }` (HR Officer); unique; audited |
+| PUT | `/api/companies/:id/mol` | Set a company's MOL code `{ molCode }` (HR Officer, System Administrator); unique per company; returns the configuration |
 | GET | `/api/leave` | Leave requests in scope |
 | POST | `/api/leave` | Submit a request (HR Officer, Department Head) |
 | POST | `/api/leave/:id/review` | HR review → Pending Approval |

@@ -38,7 +38,7 @@ export function answerAll(state, u, q) {
   }
 
   // documents the role may not see are refused, not answered with an empty list (§4.1)
-  const TYPE_WORDS = [['Passport', /passport/], ['Employment Visa', /\bvisas?\b/], ['Emirates ID', /emirates|\beid\b/], ['Health Insurance', /health insurance|insurance card|medical card/], ['Vehicle Registration', /registration|mulkiya/], ['Motor Insurance', /motor insurance|insurance copy|insurance (or|and) registration|policy/], ['Safety Certificate', /safety/], ['Inspection / Test Certificate', /inspection|test cert/], ['Other Permit', /permit/]];
+  const TYPE_WORDS = [['Passport', /passport/], ['Employment Visa', /\bvisas?\b/], ['Emirates ID', /emirates|\beid\b/], ['Labour Card', /labou?r\s*card|work\s*permit/], ['Health Insurance', /health insurance|insurance card|medical card/], ['Vehicle Registration', /registration|mulkiya/], ['Motor Insurance', /motor insurance|insurance copy|insurance (or|and) registration|policy/], ['Safety Certificate', /safety/], ['Inspection / Test Certificate', /inspection|test cert/], ['Other Permit', /permit/]];
   const asked = TYPE_WORDS.filter(([, re]) => re.test(t)).map(([k]) => k).filter((k) => canModule(u, docTypes().find((d) => d.key === k)?.module));
   const blocked = asked.filter((k) => !canSeeDoc(u, k));
   const docQuestion = /document|expir|renew|missing|scan|copy|certificate|card|\bdue\b/.test(t) || asked.length > 0;

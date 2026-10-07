@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { docStatus, fmt, docCfg } from './shared.js';
+import { docStatus, fmt, docCfg, isoToDmy, dmyToIso } from './shared.js';
 import { useStore } from './store.jsx';
 
 const P = {
@@ -31,6 +31,7 @@ const P = {
   audit: 'M19 3h-4.2A3 3 0 0 0 12 1a3 3 0 0 0-2.8 2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-7 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z',
   camera: 'M9 3 7.2 5H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.2L15 3H9zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-2a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
   lock: 'M18 8h-1V6A5 5 0 0 0 7 6v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zm-6 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm3.1-9H8.9V6a3.1 3.1 0 0 1 6.2 0v2z',
+  idcard: 'M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zM8.5 8a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM13 17H4v-.8c0-1.7 3-2.6 4.5-2.6s4.5.9 4.5 2.6v.8zm7-2h-5v-2h5v2zm0-4h-5V9h5v2z',
   swap: 'M6.99 11 3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z',
 };
 export const Icon = ({ n, size = 18, className = '' }) => (
@@ -113,6 +114,44 @@ export const Field = ({ label, children, hint, span }) => (
     {hint && <span className="field-hint">{hint}</span>}
   </label>
 );
+
+// Date field in the system format dd/mm/yyyy (Changes Report 01, item 3).
+// Type the date, or pick it from the calendar button. Works with ISO yyyy-mm-dd values like a native date input:
+// value / min / max are ISO and onChange receives { target: { value: 'yyyy-mm-dd' } } ('' while empty or incomplete).
+export function DateInput({ id, value, onChange, min, max, required, disabled, ...rest }) {
+  const [text, setText] = useState(isoToDmy(value));
+  const last = useRef(value || '');
+  const box = useRef(null);
+  const picker = useRef(null);
+  useEffect(() => { if ((value || '') !== last.current) { last.current = value || ''; setText(isoToDmy(value)); } }, [value]);
+  const emit = (v) => { last.current = v; onChange?.({ target: { value: v } }); };
+  const check = (t) => {
+    const v = dmyToIso(t);
+    let msg = '';
+    if (v === null) msg = 'Enter the date as dd/mm/yyyy.';
+    else if (v && min && v < min) msg = `The date must be on or after ${isoToDmy(min)}.`;
+    else if (v && max && v > max) msg = `The date must be on or before ${isoToDmy(max)}.`;
+    box.current?.setCustomValidity(msg);
+    return v;
+  };
+  const onText = (e) => {
+    const t = e.target.value.replace(/[^\d/.-]/g, '').slice(0, 10);
+    setText(t);
+    const v = check(t);
+    emit(v || '');
+  };
+  const onBlur = () => { const v = dmyToIso(text); if (v) setText(isoToDmy(v)); };
+  const pick = () => { const p = picker.current; if (!p || disabled) return; try { p.showPicker(); } catch { p.focus(); p.click(); } };
+  return (
+    <span className="date-input">
+      <input ref={box} id={id} type="text" inputMode="numeric" placeholder="dd/mm/yyyy" autoComplete="off" value={text} onChange={onText} onBlur={onBlur}
+        required={required} disabled={disabled} data-iso={value || ''} {...rest} />
+      <button type="button" className="date-pick" onClick={pick} disabled={disabled} aria-label="Choose date from calendar" tabIndex={-1}><Icon n="leave" size={16} /></button>
+      <input ref={picker} type="date" className="date-native" tabIndex={-1} aria-hidden="true" value={value || ''} min={min} max={max}
+        onChange={(e) => { const v = e.target.value; setText(isoToDmy(v)); check(isoToDmy(v)); emit(v); }} />
+    </span>
+  );
+}
 
 export const KV = ({ k, v, mono }) => (
   <div className="kv"><dt>{k}</dt><dd className={mono ? 'mono' : ''}>{v || '—'}</dd></div>

@@ -41,7 +41,7 @@ export default function Import({ kind }) {
             <span>{file ? `${file.name} · ${Math.round(file.size / 1024)} KB` : 'Choose a CSV file (UTF-8, first row = column names)'}</span>
           </label>
         </div>
-        <p className="field-hint">Dates as YYYY-MM-DD or DD/MM/YYYY. Department, location, company{kind === 'assets' ? ' and category' : ' and sponsor'} must match the names in Administration exactly. Leave the {kind === 'employees' ? 'emp_no' : 'fleet_no'} column empty to have numbers assigned.</p>
+        <p className="field-hint">Dates as DD/MM/YYYY. Department, location, company{kind === 'assets' ? ' and category' : ' and sponsor'} must match the names in Administration exactly.{kind === 'employees' ? ' Every row needs its emp_no (employee number); emp_code and mol_id are optional.' : ' Leave the fleet_no column empty to have numbers assigned.'}</p>
         {err && <p className="error" role="alert">{err}</p>}
         <div className="btn-row">
           <button className="btn" onClick={() => send('validate')} disabled={!!busy}>{busy === 'validate' ? 'Checking…' : 'Validate'}</button>

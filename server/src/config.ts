@@ -29,7 +29,7 @@ export const docTypeRow = (t: any) => ({
 
 export async function loadConfig(db: Db = pool): Promise<Cfg> {
   const [companies, departments, locations, categories, users, docTypes, templates, sys] = await Promise.all([
-    q('SELECT id, name, short, kind, active FROM companies ORDER BY kind DESC, name', [], db),
+    q('SELECT id, name, short, kind, active, mol_code AS "molCode" FROM companies ORDER BY kind DESC, name', [], db),
     q('SELECT id, name, active FROM departments ORDER BY id', [], db),
     q('SELECT id, name, active FROM locations ORDER BY id', [], db),
     q('SELECT name, active, sort FROM asset_categories ORDER BY sort, name', [], db),

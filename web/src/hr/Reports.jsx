@@ -1,16 +1,16 @@
 import React, { useMemo } from 'react';
 import { useStore } from '../core/store.jsx';
-import { TODAY, iso, COMPANIES_INIT } from '../core/shared.js';
+import { TODAY, iso } from '../core/shared.js';
 import { scopeEmployees, canSeeDoc } from '../core/access.js';
 import { DEPARTMENTS, hrExpiryRows as expiryRows, hrMissing } from './data.js';
 const DOC_TYPES = ['Passport', 'Employment Visa', 'Emirates ID', 'Health Insurance'];
-const SPONSORS = COMPANIES_INIT.map((c) => c.name);
 
 const COLORS = { 'Employment Visa': 'var(--c-visa)', 'Emirates ID': 'var(--c-eid)', Passport: 'var(--c-pp)', 'Health Insurance': 'var(--c-ins)' };
 
 export default function Reports() {
   const { state } = useStore();
   const emps = scopeEmployees(state.user, state.employees);
+  const SPONSORS = state.config.companies.map((c) => c.name);
 
   const months = useMemo(() => Array.from({ length: 12 }, (_, i) => {
     const d = new Date(TODAY.getFullYear(), TODAY.getMonth() + i, 1);

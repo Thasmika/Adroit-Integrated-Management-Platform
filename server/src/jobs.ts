@@ -7,6 +7,7 @@ import { env } from './env.js';
 import { cfg, loadConfig } from './config.js';
 import { audit } from './audit.js';
 import { docStatus, docCfg, officerFor, daysUntil, fmt, iso, refreshToday } from '@adroit/core/src/core/shared.js';
+import { empParam } from '@adroit/core/src/hr/data.js';
 
 type Log = { info: (m: any, ...a: any[]) => void; error: (m: any, ...a: any[]) => void };
 
@@ -69,7 +70,7 @@ export async function runExpiryJob() {
         if (a) { opened++; await pool.query("INSERT INTO action_events (action_id, by_user, status, note) VALUES ($1,'System','Open','Entered warning window')", [a.id]); }
       }
       if (!sys.alertsEnabled || !docCfg(r.type).officer) continue;
-      const link = r.owner_module === 'hr' ? `#hr-employee.${r.owner_no.replace('EMP ', '')}` : `#fleet-vehicle.${r.owner_no.replace('VH-', '')}`;
+      const link = r.owner_module === 'hr' ? `#hr-employee.${empParam(r.owner_no)}` : `#fleet-vehicle.${r.owner_no.replace('VH-', '')}`;
       const vars = { docType: r.name, owner: `${r.owner_no} ${r.owner_name}`, expiry: fmt(r.expiry), days: st.d };
       // one alert per stage per document version; expired documents alert daily until renewed
       const stage = st.key === 'expired' ? `expired:${today}` : st.key;
