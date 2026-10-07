@@ -38,36 +38,6 @@ Browser ──HTTPS──► Caddy / nginx ──► Node.js 22 application (Fas
 | `docs` | Deployment, administration, user, security, data migration, backup, AI, API, database and test documents |
 | `tools` | Documentation generator |
 
-## Quick start (development)
-
-Needs Node.js 22 and PostgreSQL 16.
-
-```bash
-npm ci
-createdb adroit
-export DATABASE_URL=postgres://postgres:<pw>@127.0.0.1:5432/adroit
-npm run seed:demo                 # fictional demo data; never on production
-npm run dev:server                 # API on :3000
-npm run dev:web                    # web on :5173 (proxies /api to :3000)
-```
-
-Demo sign-ins (password `Adroit@2026`): `gm@adroit.ae` (Management), `nadeesha.perera@adroit.ae` (HR), `imran.qureshi@adroit.ae` (PRO), `maria.santos@adroit.ae` (Insurance), `rajesh.menon@adroit.ae` (Department Head), `suresh.pillai@adroit.ae` (Fleet), `anjali.rao@adroit.ae` (Auditor), `kasun.bandara@adroit.ae` (Administrator).
-
-```bash
-npm run typecheck
-TEST_DATABASE_URL=postgres://postgres:<pw>@127.0.0.1:5432/adroit_test npm test
-npm run build                      # web/dist and server/dist
-```
-
-## Production
-
-```bash
-cd deploy && cp .env.example .env && nano .env
-docker compose up -d --build
-```
-
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for both installation options, configuration, the go-live checklist, upgrades and monitoring.
-
 ## Documentation
 
 | Document | For |
