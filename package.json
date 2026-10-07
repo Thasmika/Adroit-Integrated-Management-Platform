@@ -1,0 +1,17 @@
+{
+  "name": "adroit-integrated-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Adroit Integrated Management Platform - Phase 1: Employee, Vehicle & Equipment Management",
+  "workspaces": ["packages/core", "server", "web"],
+  "scripts": {
+    "dev:server": "npm run dev -w server",
+    "dev:web": "npm run dev -w web",
+    "build": "npm run build -w web && npm run build -w server",
+    "migrate": "npm run migrate -w server",
+    "seed:demo": "npm run seed -w server -- --demo",
+    "test": "npm test -w server",
+    "typecheck": "npm run typecheck -w server"
+  },
+  "engines": { "node": ">=20" }
+}

@@ -1,52 +1,89 @@
-# AI-Powered Adroit Integrated Management Platform
+# Adroit Integrated Management Platform
 
-Welcome to the **Adroit Integrated Management Platform** repository. This project is a complete, dual-module Integrated Management System designed to provide ultra-premium, seamless operational control over HR and Fleet management.
+**Phase 1: Employee, Vehicle & Equipment Management** for Adroit Building Materials Trading Ent. L.L.C.
 
-## 🚀 Overview
+One secure web platform with two operational modules and shared services:
 
-The Adroit Integrated Management Platform unifies complex business workflows under one intuitive and visually stunning dashboard. It eliminates the need for disconnected software by providing a centralized hub for managing employees, vehicles, compliance documents, and operational alerts.
+- **Employee Management**: employee master, the HR document centre (passport, visa, Emirates ID, insurance, certificates), expiry control, and leave from request to rejoining.
+- **Vehicle & Equipment Management**: fleet master, compliance documents (registration, insurance, safety, inspection, permits), expiry control and renewal tracking.
+- **Shared services**:
+  - one sign-in with role-based access and a Management Home;
+  - the Attention Centre, unified search and an AI assistant;
+  - private document storage with version history;
+  - one expiry engine with alerts and e-mail;
+  - an append-only audit trail;
+  - CSV data import, administration, and system health.
 
-### 🌟 Key Features
+Built to the *Integrated AI-Assisted HR, Vehicle & Equipment Management System: Technical Proposal v1.0 (September 2026)*.
 
-#### 🏢 Shared Technical Foundation
-*   **Role-Based Access Control (RBAC):** Granular permissions (View, Create, Edit, Delete, Approve) for secure access management.
-*   **Shared Document Management:** Centralized secure upload/download, versioning, and metadata tracking.
-*   **Global Expiry & Alerts Engine:** Daily evaluation, warning thresholds, and action tracking for compliance.
-*   **Immutable Audit Logging:** Secure tracking of all sensitive system actions.
-*   **Natural-Language AI Assistance:** Translate natural language questions into database queries (e.g., "Show visas expiring in 60 days").
-*   **Unified Global Search:** Instantly find employees, vehicles, and documents across the entire platform.
+## Architecture
 
-#### 👥 SYSTEM 1: Employee Management (HR) Module
-*   **Employee Master Data:** Manage Identity, Employment, Sponsorship, and Insurance details.
-*   **Employee Document Centre:** Track Passports, Visas, Emirates IDs, and Health Insurance.
-*   **Leave Management Workflow:** Request, review, approve, and track vacations and rejoinings through immersive calendars.
-*   **Premium HR Dashboard:** High-end data visualization, dynamic active counts, and crisp typography.
+```
+Browser ──HTTPS──► Caddy / nginx ──► Node.js 22 application (Fastify)
+                                        ├─ serves the React web app
+                                        ├─ REST/JSON API with server-side RBAC
+                                        ├─ background jobs: expiry & alerts, e-mail, digest
+                                        ├─ optional AI provider (read-only routing, rules-engine fallback)
+                                        ├─► PostgreSQL 16   (records, configuration, audit)
+                                        └─► private file store (scans, photos)
+```
 
-#### 🚚 SYSTEM 2: Vehicle & Equipment (Fleet) Module
-*   **Asset Master Data:** Track Fleet No, Registration, Category, Make/Model, and Chassis/VIN.
-*   **Vehicle Document Centre:** Manage Registration, Motor Insurance, Safety inspections, and Permits.
-*   **Document Control Process:** Record, upload, monitor, alert, and renew fleet documents automatically.
-*   **Premium Fleet Dashboard:** Interactive 3D charts, real-time tracking, and high-end metric displays.
+| Folder | Contents |
+|---|---|
+| `packages/core` | Business rules shared by server and web: expiry engine, access rules, attention list, rules-based AI |
+| `server` | API, authentication, jobs, storage, migrations (`server/migrations`), tests (`server/test`), CLI |
+| `web` | React web app (Vite) |
+| `deploy` | Docker Compose stack, Caddy, `.env.example`, backup / restore scripts, systemd and nginx files |
+| `e2e` | Browser end-to-end test |
+| `docs` | Deployment, administration, user, security, data migration, backup, AI, API, database and test documents |
+| `tools` | Documentation generator |
 
-## 🛠️ Technology Stack
+## Quick start (development)
 
-*   **Frontend:** [Next.js](https://nextjs.org/) / [React](https://reactjs.org/) (Ultra-Premium UI, Glassmorphism, 4K crisp assets, 3D hover effects)
-*   **Backend:** Python / [FastAPI](https://fastapi.tiangolo.com/)
-*   **Database ORM:** [SQLAlchemy](https://www.sqlalchemy.org/)
-*   **Security:** JWT Authentication & Authorization
+Needs Node.js 22 and PostgreSQL 16.
 
-## 🏗️ Project Structure
+```bash
+npm ci
+createdb adroit
+export DATABASE_URL=postgres://postgres:<pw>@127.0.0.1:5432/adroit
+npm run seed:demo                 # fictional demo data; never on production
+npm run dev:server                 # API on :3000
+npm run dev:web                    # web on :5173 (proxies /api to :3000)
+```
 
-*   `/frontend` - Next.js React application containing the UI components and pages.
-*   `/backend` - FastAPI application, database models, schemas, and API endpoints.
+Demo sign-ins (password `Adroit@2026`): `gm@adroit.ae` (Management), `nadeesha.perera@adroit.ae` (HR), `imran.qureshi@adroit.ae` (PRO), `maria.santos@adroit.ae` (Insurance), `rajesh.menon@adroit.ae` (Department Head), `suresh.pillai@adroit.ae` (Fleet), `anjali.rao@adroit.ae` (Auditor), `kasun.bandara@adroit.ae` (Administrator).
 
-## 📦 Deployment & DevOps
+```bash
+npm run typecheck
+TEST_DATABASE_URL=postgres://postgres:<pw>@127.0.0.1:5432/adroit_test npm test
+npm run build                      # web/dist and server/dist
+```
 
-The platform is designed for scalable deployment with the following pipeline:
-*   CI/CD pipelines configured for automated testing and deployment.
-*   Dockerized containers for both frontend and backend services.
-*   Automated Database backups and performance monitoring.
+## Production
 
-## 📄 License
+```bash
+cd deploy && cp .env.example .env && nano .env
+docker compose up -d --build
+```
 
-*Proprietary software. All rights reserved.*
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for both installation options, configuration, the go-live checklist, upgrades and monitoring.
+
+## Documentation
+
+| Document | For |
+|---|---|
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | IT: install, configure, go-live checklist, upgrade, monitor |
+| [ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md) | System Administrator |
+| [USER_GUIDE.md](docs/USER_GUIDE.md) | HR, PRO, Insurance, Department Heads, Management, Fleet, Auditors |
+| [SECURITY_AND_ACCESS.md](docs/SECURITY_AND_ACCESS.md) | Role / permission matrix and security controls |
+| [DATA_MIGRATION.md](docs/DATA_MIGRATION.md) | Loading existing employee and fleet records |
+| [BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md) | Backups, restore test, disaster recovery |
+| [AI.md](docs/AI.md) | AI integration, safeguards and fallback |
+| [API.md](docs/API.md) | API endpoints by service |
+| [DATABASE.md](docs/DATABASE.md) | Database schema |
+| [TEST_EVIDENCE.md](docs/TEST_EVIDENCE.md) | Test results against the §17 acceptance criteria |
+| [OPEN_DECISIONS.md](docs/OPEN_DECISIONS.md) | §19 items management must confirm, with current defaults |
+
+## Outside Phase 1
+
+Salary and payroll, WPS, accounting, vehicle maintenance and service scheduling, fuel, tyres and batteries, accidents and fines, workshop integration and cost analysis (§1.2). The modular structure allows them to be added later (§20).

@@ -1,0 +1,9 @@
+[Unit]
+Description=Adroit nightly backup (database + documents)
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=adroit
+EnvironmentFile=/etc/adroit/backup.env
+ExecStart=/bin/sh /opt/adroit/deploy/scripts/backup.sh

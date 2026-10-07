@@ -1,85 +1,31 @@
-name: Continuous Integration
-
+# Typecheck, API tests against PostgreSQL, and production builds on every push / pull request.
+name: ci
 on:
   push:
-    branches: [ "main", "develop" ]
   pull_request:
-    branches: [ "main" ]
 
 jobs:
-  lint-and-test-backend:
+  test:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16
         env:
-          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: adroit_test_db
-        ports:
-          - 5432:5432
+        ports: ["5432:5432"]
         options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    
-    defaults:
-      run:
-        working-directory: ./backend
-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/adroit_test
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-        cache: 'pip'
-        
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install flake8 pytest pytest-cov black
-        
-    - name: Lint with flake8 and black
-      run: |
-        black --check app
-        flake8 app --count --select=E9,F63,F7,F82 --show-source --statistics
-        
-    - name: Test with pytest
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/adroit_test_db
-        SECRET_KEY: test_secret_key
-      run: |
-        # Replace with actual pytest command if tests exist
-        # pytest --cov=app tests/ || echo "No tests to run or tests failed"
-        echo "Placeholder for pytest execution"
-
-  lint-and-build-frontend:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./frontend
-        
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: ./frontend/package-lock.json
-        
-    - name: Install dependencies
-      run: npm ci
-      
-    - name: Lint
-      run: npm run lint || echo "Linting skipped or failed"
-      
-    - name: Build
-      env:
-        NEXT_PUBLIC_API_URL: http://localhost/api/v1
-      run: npm run build
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Docker image builds
+        run: docker build -t adroit-platform:ci .

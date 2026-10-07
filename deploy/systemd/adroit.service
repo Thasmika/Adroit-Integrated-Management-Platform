@@ -1,0 +1,29 @@
+# Adroit Integrated Management Platform, for servers without Docker.
+# Install: see docs/DEPLOYMENT.md, section "Option B".
+[Unit]
+Description=Adroit Integrated Management Platform
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=adroit
+Group=adroit
+WorkingDirectory=/opt/adroit/server
+EnvironmentFile=/etc/adroit/adroit.env
+Environment=NODE_ENV=production
+Environment=WEB_DIR=/opt/adroit/web/dist
+Environment=MIGRATIONS_DIR=/opt/adroit/server/migrations
+ExecStart=/usr/bin/node dist/index.mjs
+Restart=on-failure
+RestartSec=5
+# hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/adroit
+ReadOnlyPaths=/var/backups/adroit
+
+[Install]
+WantedBy=multi-user.target

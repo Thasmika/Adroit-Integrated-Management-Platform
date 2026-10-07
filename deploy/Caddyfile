@@ -1,0 +1,19 @@
+# HTTPS with automatic certificates (Let's Encrypt). DOMAIN must point at this server's public IP.
+# For an internal-only server without a public name, replace the site address with ":443" and add "tls internal".
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+	request_body {
+		max_size 60MB
+	}
+	reverse_proxy app:3000 {
+		header_up X-Forwarded-Proto {scheme}
+	}
+	log {
+		output stdout
+		format console
+	}
+}
