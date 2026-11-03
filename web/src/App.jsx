@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StoreProvider, useStore, useRoute, go, href, setPending } from './core/store.jsx';
-import { Icon, Avatar, Empty } from './core/ui.jsx';
+import { Icon, Avatar, Empty, ErrorBoundary } from './core/ui.jsx';
 import { ROLES } from './core/shared.js';
 import { canModule, canAdmin, canAudit, scopeEmployees, scopeAssets, canSeeDoc } from './core/access.js';
 import { hrExpiryRows } from './hr/data.js';
@@ -155,12 +155,20 @@ function Shell() {
             <button className="icon-btn" onClick={act.logout} aria-label="Sign out" title="Sign out"><Icon n="logout" /></button>
           </div>
         </header>
-        <main className="content" data-module={group}>{page}</main>
+        <main className="content" data-module={group}>
+          <ErrorBoundary key={P}>{page}</ErrorBoundary>
+        </main>
       </div>
     </div>
   );
 }
 
 export default function App() {
-  return <StoreProvider><Shell /></StoreProvider>;
+  return (
+    <ErrorBoundary>
+      <StoreProvider>
+        <Shell />
+      </StoreProvider>
+    </ErrorBoundary>
+  );
 }

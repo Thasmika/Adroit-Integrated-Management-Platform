@@ -1,16 +1,21 @@
 import React, { useMemo } from 'react';
 import { useStore } from '../core/store.jsx';
 import { TODAY, iso } from '../core/shared.js';
-import { scopeEmployees, canSeeDoc } from '../core/access.js';
-import { DEPARTMENTS, hrExpiryRows as expiryRows, hrMissing } from './data.js';
-const DOC_TYPES = ['Passport', 'Employment Visa', 'Emirates ID', 'Health Insurance'];
+import { scopeEmployees } from '../core/access.js';
+import { DEPARTMENTS, hrExpiryRows as expiryRows, hrMissing, SPONSORS } from './data.js';
 
-const COLORS = { 'Employment Visa': 'var(--c-visa)', 'Emirates ID': 'var(--c-eid)', Passport: 'var(--c-pp)', 'Health Insurance': 'var(--c-ins)' };
+const DOC_TYPES = ['Passport', 'Employment Visa', 'Emirates ID', 'Labour Card', 'Health Insurance'];
+const COLORS = {
+  'Employment Visa': 'var(--c-visa)',
+  'Emirates ID': 'var(--c-eid)',
+  Passport: 'var(--c-pp)',
+  'Labour Card': '#f59e0b',
+  'Health Insurance': 'var(--c-ins)',
+};
 
 export default function Reports() {
   const { state } = useStore();
   const emps = scopeEmployees(state.user, state.employees);
-  const SPONSORS = state.config.companies.map((c) => c.name);
 
   const months = useMemo(() => Array.from({ length: 12 }, (_, i) => {
     const d = new Date(TODAY.getFullYear(), TODAY.getMonth() + i, 1);
@@ -20,10 +25,11 @@ export default function Reports() {
     emps.forEach((e) => e.docs.forEach((doc) => { if (DOC_TYPES.includes(doc.type) && doc.expiry?.slice(0, 7) === key) by[doc.type]++; }));
     return { label: d.toLocaleDateString('en-GB', { month: 'short' }), year: d.getFullYear(), by, total: Object.values(by).reduce((a, b) => a + b, 0) };
   }), [emps]);
-  const maxM = Math.max(...months.map((m) => m.total));
+  const maxM = Math.max(...months.map((m) => m.total), 1);
 
   const nat = Object.entries(emps.reduce((a, e) => ({ ...a, [e.nationality]: (a[e.nationality] || 0) + 1 }), {})).sort((a, b) => b[1] - a[1]);
-  const sp = SPONSORS.map((s) => [s, emps.filter((e) => e.sponsor === s).length]);
+  const sponsorsList = state.config.companies?.length ? state.config.companies.map((c) => c.name) : SPONSORS;
+  const sp = sponsorsList.map((s) => [s, emps.filter((e) => e.sponsor === s).length]);
   const due60 = expiryRows(emps, 60);
   const dept = DEPARTMENTS.map((d) => {
     const list = emps.filter((e) => e.department === d);
@@ -63,7 +69,7 @@ export default function Reports() {
             </div>
           ))}
         </div>
-        <p className="muted small">December peaks because group health insurance renews annually for all members on 31 December.</p>
+        <p className="muted small">December peaks because group health insurance renews annually for all members on 31 December. Labour Card expires every 2 years according to MOHRE contracts.</p>
       </section>
 
       <section className="panel flush">

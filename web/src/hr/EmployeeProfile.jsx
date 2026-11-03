@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useStore, go } from '../core/store.jsx';
 import { fmt, docStatus, officerFor, TODAY, docCfg, OPERATING, ROLES, docTypes, actionStatus } from '../core/shared.js';
 import { scopeEmployees, canSeeDoc, can } from '../core/access.js';
-import { Icon, Tabs, KV, StatusPill, LeavePill, DocViewer, Empty, PhotoBox, ActionPill } from '../core/ui.jsx';
+import { Icon, Tabs, KV, StatusPill, LeavePill, DocViewer, Empty, PhotoBox, ActionPill, Modal } from '../core/ui.jsx';
 import { UploadDocModal, RenewalActionModal } from '../core/docModals.jsx';
 import ApplyLeaveModal from './ApplyLeaveModal.jsx';
 import LeavePrintModal from './LeavePrintModal.jsx';
@@ -14,7 +14,7 @@ const age = (dob) => Math.floor((TODAY - new Date(dob + 'T00:00:00')) / (365.25 
 const service = (j) => { const m = Math.floor((TODAY - new Date(j + 'T00:00:00')) / (30.44 * 864e5)); return `${Math.floor(m / 12)} yrs ${m % 12} mths`; };
 
 export default function EmployeeProfile({ param }) {
-  const { state } = useStore();
+  const { state, act, notify } = useStore();
   const u = state.user;
   const emp = scopeEmployees(u, state.employees).find((e) => e.id === empIdFromParam(param));
   const [tab, setTab] = useState('Personal');
@@ -23,6 +23,8 @@ export default function EmployeeProfile({ param }) {
   const [tracking, setTracking] = useState(null);
   const [applying, setApplying] = useState(false);
   const [printingLeave, setPrintingLeave] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   if (!emp) return <div className="page"><Empty title="Employee not found or outside your access">Check the employee number, or go back to <a href="#hr-employees">Employees</a>.</Empty></div>;
 
   const limited = ROLES[u.role].noDocs;
@@ -114,6 +116,19 @@ export default function EmployeeProfile({ param }) {
     );
   };
 
+  const doDelete = async () => {
+    setDeleting(true);
+    try {
+      await act.deleteEmployee(emp.id);
+      notify(`Employee ${emp.name} (${emp.id}) deleted`);
+      go('hr-employees');
+    } catch (err) {
+      notify(`Failed to delete employee: ${err.message}`, 'error');
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  };
+
   return (
     <div className="page">
       <button className="back" onClick={() => go('hr-employees')}><Icon n="back" size={16} /> Employees</button>
@@ -123,7 +138,7 @@ export default function EmployeeProfile({ param }) {
         <div className="profile-id">
           <span className="mono emp-no">{emp.id}{emp.code ? ` · ${emp.code}` : ''}</span>
           <h1>{emp.name}</h1>
-          <p>{emp.designation} · {emp.department} · {emp.location}</p>
+          <p>{emp.designation} · {emp.department}</p>
           <div className="chips">
             <span className={'pill ' + (emp.status === 'Active' ? 'pill-valid' : 'pill-due')}>{emp.status}</span>
             {current && <LeavePill status={current.status} />}
@@ -135,6 +150,7 @@ export default function EmployeeProfile({ param }) {
           {canEdit && <button className="btn" onClick={() => go('hr-edit', empParam(emp.id))}><Icon n="edit" size={16} /> Edit</button>}
           {can(u, 'submitLeave') && <button className="btn" onClick={() => setApplying(true)}><Icon n="leave" size={16} /> Apply leave</button>}
           {docTypes('hr').some((t) => can(u, 'uploadDoc', { type: t.key })) && <button className="btn btn-primary" onClick={() => setUpload({ type: null, mode: 'upload' })}><Icon n="upload" size={16} /> Upload document</button>}
+          {canEdit && <button className="btn btn-ghost danger-btn" onClick={() => setConfirmDelete(true)}><Icon n="trash" size={16} /> Delete</button>}
         </div>
       </section>
 
@@ -226,6 +242,20 @@ export default function EmployeeProfile({ param }) {
       {tracking && <RenewalActionModal module="hr" owner={emp} doc={tracking} onClose={() => setTracking(null)} />}
       {applying && <ApplyLeaveModal emp={emp} onClose={() => setApplying(false)} />}
       {printingLeave && <LeavePrintModal leave={printingLeave} emp={emp} close={() => setPrintingLeave(null)} />}
+      {confirmDelete && (
+        <Modal title="Delete Employee" onClose={() => !deleting && setConfirmDelete(false)}>
+          <div className="stack pad">
+            <p>Are you sure you want to permanently delete <strong>{emp.name}</strong> ({emp.id})?</p>
+            <p className="muted small">This action cannot be undone. All associated records, documents, files, and leave logs will be permanently removed.</p>
+            <div className="btn-row end" style={{ marginTop: '16px' }}>
+              <button className="btn" disabled={deleting} onClick={() => setConfirmDelete(false)}>Cancel</button>
+              <button className="btn btn-primary" style={{ background: 'var(--red, #b91c1c)', borderColor: 'var(--red, #b91c1c)', color: '#fff' }} disabled={deleting} onClick={doDelete}>
+                {deleting ? 'Deleting…' : 'Yes, Delete Employee'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

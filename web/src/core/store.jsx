@@ -80,11 +80,23 @@ export function StoreProvider({ children }) {
     // employees / assets
     async saveEmployee(emp, editingNo) {
       const e = await api(editingNo ? 'PUT' : 'POST', editingNo ? `/api/employees/${enc(editingNo)}` : '/api/employees', emp);
-      patch('employees', e); return e;
+      if (editingNo) setState((s) => ({ ...s, employees: s.employees.map((x) => (x.id === editingNo ? e : x)) }));
+      else patch('employees', e);
+      return e;
+    },
+    async deleteEmployee(no) {
+      await api('DELETE', `/api/employees/${enc(no)}`);
+      setState((s) => ({
+        ...s,
+        employees: s.employees.filter((x) => x.id !== no && x.empNo !== no),
+        leaves: s.leaves.filter((x) => x.empId !== no)
+      }));
     },
     async saveAsset(asset, editingNo) {
       const a = await api(editingNo ? 'PUT' : 'POST', editingNo ? `/api/assets/${enc(editingNo)}` : '/api/assets', asset);
-      patch('assets', a); return a;
+      if (editingNo) setState((s) => ({ ...s, assets: s.assets.map((x) => (x.id === editingNo ? a : x)) }));
+      else patch('assets', a);
+      return a;
     },
     async uploadPhoto(module, no, file) {
       const fd = new FormData(); fd.append('file', file);

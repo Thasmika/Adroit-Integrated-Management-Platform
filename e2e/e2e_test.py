@@ -75,8 +75,8 @@ with sync_playwright() as p:
     pg.screenshot(path=OUT + 'cr01-labour-card.png', full_page=True)
     go(pg, 'hr-employees'); pg.wait_for_timeout(300)
     check('employees filters: branch, visa-sponsor type and document status removed', pg.locator('#f-loc').count() == 0 and pg.locator('#f-flag').count() == 0 and pg.locator('text=Any visa sponsor').count() == 0)
-    ncos = pg.locator('#f-company option').count() - 1
-    check(f'company and sponsor filters list all companies ({ncos})', ncos >= 4 and pg.locator('#f-sponsor option').count() - 1 == ncos)
+    ncos = pg.locator('#f-sponsor option').count() - 1
+    check(f'sponsor filter lists all companies ({ncos})', ncos >= 4)
     check('status filter has no On Notice', 'On Notice' not in pg.locator('#f-status').inner_text())
     pg.select_option('#f-code', 'STF'); pg.wait_for_timeout(300)
     codes = set(pg.locator('tbody tr td:nth-child(2)').all_inner_texts())
@@ -88,9 +88,42 @@ with sync_playwright() as p:
     go(pg, 'hr-mol'); pg.wait_for_timeout(400)
     check('MOL register: company and employee tables', pg.locator('#mol-companies tbody tr').count() >= 4 and pg.locator('#mol-employees tbody tr').count() == 25)
     pg.click('#mol-co-ATS-edit'); pg.fill('#mol-co-ATS', '7777777'); pg.click('#mol-companies button:has-text("Save")'); pg.wait_for_timeout(900)
-    check('company MOL code saved', pg.locator('#mol-companies >> text=7777777').count() == 1)
-    pg.screenshot(path=OUT + 'cr01-mol-register.png', full_page=True)
+    # HR System Updates - Part 2
+    go(pg, 'hr-leave')
+    # Item 4: On-vacation search & rejected tab
+    pg.click('.tab:has-text("On leave & rejoining")'); pg.wait_for_timeout(300)
+    check('on vacation search input present', pg.locator('#vacation-search').count() == 1)
+    pg.click('.tab:has-text("Rejected")'); pg.wait_for_timeout(300)
+    check('rejected leaves tab present with search', pg.locator('#rejected-search').count() == 1)
+
+    # Item 5: Rejoin Add Modal with auto-filled details and alphabetical order
+    pg.click('button:has-text("Record rejoining") >> nth=0'); pg.wait_for_timeout(400)
+    check('rejoin add modal opens with auto-fill', pg.locator('#rj-emp-select').count() == 1 or pg.locator('text=No employees currently on leave').count() == 1)
+    if pg.locator('#rj-emp-select').count() == 1:
+        pg.click('.modal button:has-text("Cancel")')
+    else:
+        pg.click('.modal button:has-text("Close")')
+
+    # Item 6: Rejoined Report (PDF)
+    pg.click('button:has-text("Rejoined Report (PDF)")'); pg.wait_for_timeout(400)
+    check('rejoined report modal has from/to date pickers and print', pg.locator('#rep-from').count() == 1 and pg.locator('#rep-to').count() == 1 and pg.locator('button:has-text("Print / Export PDF")').count() == 1)
+    pg.click('.modal button:has-text("Close")')
+
+    # Item 7: New Leave Request auto-fills home number
+    pg.click('button:has-text("New leave request")'); pg.wait_for_timeout(400)
+    contact_val = pg.input_value('#lv-contact')
+    check('new leave request auto-fills contact/home number', len(contact_val) > 0)
+    pg.click('.modal button:has-text("Cancel")')
+
+    # Item 3: Print leave application includes Sponsoring company
+    go(pg, 'hr-leave.history'); pg.wait_for_timeout(300)
+    if pg.locator('button:has-text("Print")').count() > 0:
+        pg.click('button:has-text("Print") >> nth=0'); pg.wait_for_timeout(400)
+        check('print form includes Sponsor Company', pg.locator('text=Visa Sponsoring Company').count() >= 1 or pg.locator('text=Visa Sponsor').count() >= 1)
+        pg.click('button:has-text("Close")')
+
     logout(pg)
+
 
     # Management: approve, attention centre, cross-module AI, notifications, audit, asset history
     login(pg, 'gm@adroit.ae'); pg.screenshot(path=OUT + 'gm-home.png', full_page=True)

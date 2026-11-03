@@ -25,7 +25,7 @@ export const scopeAssets = (u, list) => (canModule(u, 'fleet') ? list : []);
 export const visibleDocs = (u, docs) => docs.filter((d) => canSeeDoc(u, d.type));
 
 export function can(u, action, ctx = {}) {
-  if (!u || readOnly(u) && action !== 'approveLeave') return false;
+  if (!u || (readOnly(u) && !['approveLeave', 'rejoin'].includes(action))) return false;
   if (u.role === 'sysadmin') return true;
   switch (action) {
     case 'editEmployee': return u.role === 'hr';
@@ -39,7 +39,8 @@ export function can(u, action, ctx = {}) {
     case 'submitLeave': return ['hr', 'depthead'].includes(u.role);
     case 'reviewLeave': return u.role === 'hr';
     case 'approveLeave': return u.role === 'management';
-    case 'rejoin': return ['hr', 'depthead'].includes(u.role);
+    case 'rejoin': return ['hr', 'depthead', 'management', 'sysadmin'].includes(u.role);
     default: return false;
   }
 }
+

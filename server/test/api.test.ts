@@ -352,3 +352,16 @@ test('CR01: dates are shown as dd/mm/yyyy', async () => {
   const leave = await req('GET', '/api/audit?q=Leave', 'aud');
   assert.ok(!leave.body.items.some((x: any) => /\b\d{4}-\d{2}-\d{2}\b/.test(x.detail || '') && /→/.test(x.detail)), 'audit text uses dd/mm/yyyy');
 });
+
+test('Part 3: employee delete removes employee, leaves, and documents transactionally', async () => {
+  // Non-HR cannot delete employees
+  assert.equal((await req('DELETE', '/api/employees/EMP%200001', 'fleet')).status, 403);
+  assert.equal((await req('DELETE', '/api/employees/EMP%200001', 'dh')).status, 403);
+  // Delete with HR
+  const del = await req('DELETE', '/api/employees/EMP%200001', 'hr');
+  assert.equal(del.status, 200);
+  assert.equal(del.body.ok, true);
+  // Re-fetching should return 404
+  const check = await req('GET', '/api/employees/EMP%200001', 'hr');
+  assert.equal(check.status, 404);
+});

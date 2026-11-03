@@ -9,7 +9,7 @@ import { audit } from '../audit.js';
 import { openFile } from '../storage.js';
 import { env } from '../env.js';
 import { canModule, canSeeDoc } from '@adroit/core/src/core/access.js';
-import { ROLES } from '@adroit/core/src/core/shared.js';
+import { ROLES, OPERATING } from '@adroit/core/src/core/shared.js';
 import { buildAttention, isAttention, leaveActions } from '@adroit/core/src/core/attention.js';
 import { answerAll } from '@adroit/core/src/core/ai.js';
 import { planWithProvider, planToQuestion, aiConfigured } from '../ai.js';
@@ -27,7 +27,7 @@ export default async function coreRoutes(app: FastifyInstance) {
   });
 
   // before sign-in: whether this is a demo installation (shows the demo accounts on the sign-in page)
-  app.get('/api/public-info', async () => ({ demo: (cfg().system as any).demoMode === true, organisation: 'Adroit Building Materials Trading Ent. L.L.C' }));
+  app.get('/api/public-info', async () => ({ demo: (cfg().system as any).demoMode === true, organisation: OPERATING }));
 
   // Everything the signed-in user may see, in one call (Phase 1 volumes: hundreds of employees and assets)
   app.get('/api/bootstrap', { preHandler: requireUser }, async (req) => {

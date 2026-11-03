@@ -4,7 +4,7 @@ import { fmt, docTypes, officerFor, actionStatus, docStatus } from '../core/shar
 import { scopeEmployees, canSeeDoc, can } from '../core/access.js';
 import { Icon, Tabs, StatusPill, DocViewer, Avatar, Empty, ActionPill } from '../core/ui.jsx';
 import { UploadDocModal, RenewalActionModal } from '../core/docModals.jsx';
-import { hrExpiryRows, hrMissing, empParam, maskNo } from './data.js';
+import { hrExpiryRows, hrMissing, empParam, maskNo, SPONSORS } from './data.js';
 
 const TABS = ['expiry', 'alerts', 'library', 'missing'];
 
@@ -100,7 +100,7 @@ export default function HrDocuments({ initialTab }) {
             <select id="hd-act" value={f.action} onChange={set('action')} aria-label="Action status"><option value="">Any action status</option>{['Open', 'In Progress', 'Submitted to authority', 'Awaiting payment', 'On hold'].map((s) => <option key={s}>{s}</option>)}</select>
             {!u.scope && <select id="hd-dept" value={f.dept} onChange={set('dept')} aria-label="Department"><option value="">All departments</option>{state.config.departments.map((d) => <option key={d.id}>{d.name}</option>)}</select>}
             <select id="hd-loc" value={f.loc} onChange={set('loc')} aria-label="Branch / location"><option value="">All locations</option>{state.config.locations.map((d) => <option key={d.id}>{d.name}</option>)}</select>
-            <select id="hd-co" value={f.company} onChange={set('company')} aria-label="Visa sponsor"><option value="">Any sponsor company</option>{state.config.companies.map((c) => <option key={c.id} value={c.name}>{c.short}</option>)}</select>
+            <select id="hd-co" value={f.company} onChange={set('company')} aria-label="Visa sponsor"><option value="">Any sponsor company</option>{((state.config.companies?.length ? state.config.companies.map((c) => c.name) : SPONSORS)).map((s) => <option key={s} value={s}>{s}</option>)}</select>
           </div>
           <ExpiryTable list={rows} />
           <div className="pager"><span className="muted small">{rows.length} documents {win === 0 ? 'already expired' : `expired or expiring within ${win} days`}</span></div>

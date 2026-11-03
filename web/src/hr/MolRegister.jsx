@@ -7,6 +7,7 @@ import { useStore, href } from '../core/store.jsx';
 import { scopeEmployees, can } from '../core/access.js';
 import { Icon } from '../core/ui.jsx';
 import { empParam } from './data.js';
+import MolCompanyModal from './MolCompanyModal.jsx';
 
 const PAGE = 25;
 
@@ -45,6 +46,7 @@ export default function MolRegister() {
   const [q, setQ] = useState('');
   const [missing, setMissing] = useState(false);
   const [page, setPage] = useState(0);
+  const [selectedCompany, setSelectedCompany] = useState(null);
 
   const rows = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -74,14 +76,48 @@ export default function MolRegister() {
         <div className="panel-head pad"><h2>Company MOL codes</h2><span className="muted small">{companies.filter((c) => c.molCode).length} of {companies.length} recorded</span></div>
         <div className="table-wrap">
           <table className="table" id="mol-companies">
-            <thead><tr><th>Company Name</th><th>MOL Code</th><th className="right">Employees sponsored</th></tr></thead>
-            <tbody>{companies.map((c) => (
-              <tr key={c.id} className={c.active ? '' : 'inactive'}>
-                <td><strong>{c.name}</strong><small className="block muted">{c.kind}{c.active ? '' : ' · inactive'}</small></td>
-                <td><EditCell id={'mol-co-' + c.id} value={c.molCode} canEdit={canEdit} label={`MOL code for ${c.name}`} onSave={(v) => saveCompany(c, v)} /></td>
-                <td className="right">{emps.filter((e) => e.sponsor === c.name).length}</td>
-              </tr>
-            ))}</tbody>
+            <thead><tr><th>Company Name</th><th>MOL Code</th><th>Employees sponsored</th><th className="right" style={{ width: '90px' }}>Action</th></tr></thead>
+            <tbody>{companies.map((c) => {
+              const count = emps.filter((e) => e.sponsor === c.name).length;
+              return (
+                <tr key={c.id} className={c.active ? '' : 'inactive'}>
+                  <td>
+                    <button
+                      type="button"
+                      className="link"
+                      style={{ textAlign: 'left', fontWeight: 'bold', fontSize: 'inherit', padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}
+                      onClick={() => setSelectedCompany(c)}
+                      title={`Open employees sponsored under ${c.name}`}
+                    >
+                      {c.name}
+                    </button>
+                    <small className="block muted">{c.kind}{c.active ? '' : ' · inactive'}</small>
+                  </td>
+                  <td><EditCell id={'mol-co-' + c.id} value={c.molCode} canEdit={canEdit} label={`MOL code for ${c.name}`} onSave={(v) => saveCompany(c, v)} /></td>
+                  <td>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-ghost"
+                      onClick={() => setSelectedCompany(c)}
+                      title={`Open employees sponsored under ${c.name}`}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <strong>{count}</strong> {count === 1 ? 'employee' : 'employees'}
+                    </button>
+                  </td>
+                  <td className="right">
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => setSelectedCompany(c)}
+                      title={`Open employee list and PDF export for ${c.name}`}
+                    >
+                      <Icon n="eye" size={13} /> View
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}</tbody>
           </table>
         </div>
       </section>
@@ -116,6 +152,8 @@ export default function MolRegister() {
           </div>
         </div>
       </section>
+
+      {selectedCompany && <MolCompanyModal company={selectedCompany} onClose={() => setSelectedCompany(null)} />}
     </div>
   );
 }

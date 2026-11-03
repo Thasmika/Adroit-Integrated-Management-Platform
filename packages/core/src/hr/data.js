@@ -6,6 +6,17 @@ export const LEAVE_TYPES = ['Annual Leave', 'Emergency Leave', 'Sick Leave'];
 // 'On Notice' removed from the choices (Changes Report 01, item 5); older records keep their value until edited
 export const HR_STATUSES = ['Active', 'Inactive', 'Resigned', 'Terminated'];
 const INSURERS = ['Daman', 'AXA Gulf', 'Oman Insurance', 'Sukoon Insurance'];
+export const SPONSORS = [
+  "Adroit Building Material Trading Enterprises",
+  "Adroit Enterprises L.L.C Satwa Branch",
+  "Al Boom Al Fiddi General Land Transport",
+  "Adroit Enterprises L.L.C Aweer Shop",
+  "Gateway General Land Transport",
+  "Technical Workshop Reparing All Cars",
+  "Adroit Contracting",
+  "Al Mahara Machinery & Equipment Rental",
+  "Najam Al Barri Building Equipment Rental"
+];
 
 const FIRST = {
   Indian: ['Rajesh', 'Anil', 'Suresh', 'Vinod', 'Pradeep', 'Ramesh', 'Sanjay', 'Deepak', 'Manoj', 'Arun', 'Priya', 'Lakshmi'],

@@ -33,6 +33,9 @@ const P = {
   lock: 'M18 8h-1V6A5 5 0 0 0 7 6v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zm-6 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm3.1-9H8.9V6a3.1 3.1 0 0 1 6.2 0v2z',
   idcard: 'M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zM8.5 8a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM13 17H4v-.8c0-1.7 3-2.6 4.5-2.6s4.5.9 4.5 2.6v.8zm7-2h-5v-2h5v2zm0-4h-5V9h5v2z',
   swap: 'M6.99 11 3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z',
+  trash: 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z',
+  print: 'M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z',
+  download: 'M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z',
 };
 export const Icon = ({ n, size = 18, className = '' }) => (
   <svg className={'ic ' + className} width={size} height={size} viewBox="0 0 24 24" aria-hidden="true"><path d={P[n]} fill="currentColor" /></svg>
@@ -115,8 +118,37 @@ export const Field = ({ label, children, hint, span }) => (
   </label>
 );
 
-// Date field in the system format dd/mm/yyyy (Changes Report 01, item 3).
-// Type the date, or pick it from the calendar button. Works with ISO yyyy-mm-dd values like a native date input:
+// Auto-mask digits into dd/mm/yyyy as the user types (HR Updates - Part 3)
+export function formatAutoDateMask(val, prevVal = '') {
+  if (!val) return '';
+  const isDeleting = val.length < prevVal.length;
+  let cleaned = val;
+  if (!isDeleting) {
+    if (/^\d[/.-]$/.test(cleaned)) {
+      cleaned = '0' + cleaned[0] + '/';
+    } else if (/^\d{2}[/.-]\d[/.-]$/.test(cleaned)) {
+      const parts = cleaned.split(/[/.-]/);
+      cleaned = `${parts[0]}/0${parts[1]}/`;
+    }
+  }
+  const digits = cleaned.replace(/\D/g, '').slice(0, 8);
+  if (!digits) return '';
+
+  if (isDeleting) {
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+  }
+
+  if (digits.length < 2) return digits;
+  if (digits.length === 2) return `${digits}/`;
+  if (digits.length < 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  if (digits.length === 4) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4, 8)}`;
+}
+
+// Date field in the system format dd/mm/yyyy (Changes Report 01, item 3; HR Updates Part 3).
+// Type the date (with automatic mask), or pick it from the calendar button. Works with ISO yyyy-mm-dd values like a native date input:
 // value / min / max are ISO and onChange receives { target: { value: 'yyyy-mm-dd' } } ('' while empty or incomplete).
 export function DateInput({ id, value, onChange, min, max, required, disabled, ...rest }) {
   const [text, setText] = useState(isoToDmy(value));
@@ -135,9 +167,11 @@ export function DateInput({ id, value, onChange, min, max, required, disabled, .
     return v;
   };
   const onText = (e) => {
-    const t = e.target.value.replace(/[^\d/.-]/g, '').slice(0, 10);
-    setText(t);
-    const v = check(t);
+    let raw = e.target.value;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) raw = isoToDmy(raw);
+    const masked = formatAutoDateMask(raw, text);
+    setText(masked);
+    const v = check(masked);
     emit(v || '');
   };
   const onBlur = () => { const v = dmyToIso(text); if (v) setText(isoToDmy(v)); };
@@ -205,3 +239,40 @@ export function PhotoBox({ module, owner, canEdit, size = 'lg' }) {
 export const Empty = ({ title, children }) => (
   <div className="empty"><strong>{title}</strong>{children && <p>{children}</p>}</div>
 );
+
+export class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('UI Error caught by boundary:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="page">
+          <div className="panel" style={{ padding: '2rem', textAlign: 'center' }}>
+            <h2 style={{ marginBottom: '0.75rem', color: '#ff6b6b' }}>Something went wrong loading this view</h2>
+            <p className="muted" style={{ marginBottom: '1.5rem' }}>
+              {this.state.error?.message || 'An unexpected rendering error occurred.'}
+            </p>
+            <div className="btn-row center">
+              <button className="btn btn-primary" onClick={() => { this.setState({ hasError: false, error: null }); window.location.hash = '#home'; }}>
+                Return to Management Home
+              </button>
+              <button className="btn" onClick={() => window.location.reload()}>
+                Reload Page
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+

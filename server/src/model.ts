@@ -89,7 +89,8 @@ export async function loadLeaves(opts: { ids?: string[]; empUids?: string[] } = 
   return rows.map((l) => ({
     id: l.id, uid: l.employee_id, empId: l.emp_no, type: l.type, start: l.start_date, end: l.end_date, days: l.days, reason: l.reason,
     contactAbroad: l.contact_abroad, status: l.status, requestedBy: l.requested_by, requestedOn: l.requested_on, hrNote: l.hr_note,
-    decidedBy: l.decided_by, rejectReason: l.reject_reason, rejoined: l.rejoined, rejoinNote: l.rejoin_note, trail: trail.get(l.id) || [],
+    decidedBy: l.decided_by, decidedAt: l.decided_at ? new Date(l.decided_at).toISOString().slice(0, 10) : null,
+    rejectReason: l.reject_reason, rejoined: l.rejoined, rejoinNote: l.rejoin_note, trail: trail.get(l.id) || [],
   }));
 }
 

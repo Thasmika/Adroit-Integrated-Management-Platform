@@ -32,18 +32,16 @@ export function prng(seed) {
 
 // ---------- reference masters (§5) ----------
 export const COMPANIES_INIT = [
-  'Adroit Building Materials Trading Ent. L.L.C',
-  'Gateway Gulf Transport L.L.C',
-  'Adroit General Trading L.L.C',
-  'Adroit Technical Services L.L.C'
-].map((name, i) => ({ 
-  id: 'C' + String(i + 1).padStart(2, '0'), 
-  name, 
-  short: name.replace(' L.L.C', '').replace(' Ent.', ''), 
-  kind: 'Operating company', 
-  active: true, 
-  molCode: '11000' + i 
-}));
+  { id: 'C02', name: 'Adroit Building Material Trading Enterprises', short: 'Adroit BMT', kind: 'Operating company', active: true, molCode: '229088' },
+  { id: 'C01', name: 'Adroit Enterprises L.L.C Satwa Branch', short: 'Adroit Satwa', kind: 'Operating company', active: true, molCode: '229089' },
+  { id: 'C03', name: 'Al Boom Al Fiddi General Land Transport', short: 'Al Boom', kind: 'Operating company', active: true, molCode: '238939' },
+  { id: 'C04', name: 'Adroit Enterprises L.L.C Aweer Shop', short: 'Adroit Aweer', kind: 'Operating company', active: true, molCode: '229090' },
+  { id: 'C05', name: 'Gateway General Land Transport', short: 'Gateway', kind: 'Operating company', active: true, molCode: '541870' },
+  { id: 'C06', name: 'Technical Workshop Reparing All Cars', short: 'Technical Workshop', kind: 'Operating company', active: true, molCode: '167612' },
+  { id: 'C07', name: 'Adroit Contracting', short: 'Adroit Contracting', kind: 'Operating company', active: true, molCode: '324688' },
+  { id: 'C08', name: 'Al Mahara Machinery & Equipment Rental', short: 'Al Mahara', kind: 'Operating company', active: true, molCode: '278408' },
+  { id: 'C09', name: 'Najam Al Barri Building Equipment Rental', short: 'Najam Al Barri', kind: 'Operating company', active: true, molCode: '219281' },
+];
 export const OPERATING = COMPANIES_INIT[0].name;
 export const DEPARTMENTS_INIT = [
   'Administrative Department', 'Trading Department', 'Transport Department', 'Transport & Trading Department', 'Satwa Branch',

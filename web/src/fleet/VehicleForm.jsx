@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useStore, go } from '../core/store.jsx';
-import { requiredFor, docTypes, officerFor } from '../core/shared.js';
+import { requiredFor, docTypes, officerFor, OPERATING } from '../core/shared.js';
 import { can } from '../core/access.js';
 import { CATEGORIES, STATUSES, USAGE, assetIdFromParam, assetParam } from './data.js';
 import { Field, Icon, VehicleArt, Empty, DateInput } from '../core/ui.jsx';
@@ -8,14 +8,18 @@ import { Field, Icon, VehicleArt, Empty, DateInput } from '../core/ui.jsx';
 export default function VehicleForm({ param }) {
   const { state, act, notify } = useStore();
   const [busy, setBusy] = useState(false);
-  const cfg = state.config;
-  const fleetOfficers = cfg.users.filter((x) => x.active && ['fleet', 'insurance'].includes(x.role));
+  const cfg = state.config || {};
+  const fleetOfficers = (cfg?.users || []).filter((x) => x.active && ['fleet', 'insurance'].includes(x.role));
   const editing = param ? state.assets.find((a) => a.id === assetIdFromParam(param)) : null;
   const nextNo = 'New asset';
+  const activeCompanies = (cfg?.companies || []).filter((c) => c.active);
+  const defaultCompany = activeCompanies.find((c) => c.name === OPERATING)?.name || activeCompanies[0]?.name || OPERATING;
+  const defaultDept = (cfg?.departments || []).find((d) => d.active && d.name.includes('Transport'))?.name || (cfg?.departments || [])[0]?.name || 'Transport Department';
+  const defaultLoc = (cfg?.locations || []).find((l) => l.active && l.name === 'Aweer')?.name || (cfg?.locations || [])[0]?.name || 'Aweer';
   const [f, setF] = useState(() => editing ? { ...editing } : {
     id: nextNo, category: CATEGORIES[0], make: '', model: '', body: '', year: new Date().getFullYear(), colour: 'White', emirate: 'Dubai', plate: '',
-    vin: '', engine: '', company: cfg.companies[0].name, department: 'Transport Department', location: 'Aweer', status: 'Active',
-    usage: 'Delivery', officer: officerFor('Vehicle Registration').name, photo: null, capacity: '', acquired: '', odometer: '', remarks: '', docs: [],
+    vin: '', engine: '', company: defaultCompany, department: defaultDept, location: defaultLoc, status: 'Active',
+    usage: 'Delivery', officer: officerFor('Vehicle Registration')?.name || fleetOfficers[0]?.name || 'Fleet Officer', photo: null, capacity: '', acquired: '', odometer: '', remarks: '', docs: [],
   });
   const [err, setErr] = useState('');
   if (!can(state.user, 'editAsset')) return <div className="page"><Empty title="Only the Fleet / Transport Officer can add or edit assets" /></div>;
@@ -77,10 +81,10 @@ export default function VehicleForm({ param }) {
         <fieldset className="panel">
           <legend>Ownership &amp; operation</legend>
           <div className="form-grid cols-3">
-            <Field label="Owning / registered company" span={2} hint="Assets may be registered under Adroit or a group company."><select id="vf-co" value={f.company} onChange={set('company')}>{cfg.companies.filter((c) => c.active || c.name === f.company).map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></Field>
+            <Field label="Owning / registered company" span={2} hint="Assets may be registered under Adroit or a group company."><select id="vf-co" value={f.company} onChange={set('company')}>{(cfg?.companies || []).filter((c) => c.active || c.name === f.company).map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></Field>
             <Field label="Operational / lifecycle status" hint="Inactive and Disposed assets keep their profile and history but leave expiry monitoring."><select id="vf-status" value={f.status} onChange={set('status')}>{STATUSES.map((c) => <option key={c}>{c}</option>)}</select></Field>
-            <Field label="Department / branch"><select id="vf-dept" value={f.department} onChange={set('department')}>{cfg.departments.filter((d) => d.active || d.name === f.department).map((d) => <option key={d.id}>{d.name}</option>)}</select></Field>
-            <Field label="Current location"><select id="vf-loc" value={f.location} onChange={set('location')}>{cfg.locations.filter((d) => d.active || d.name === f.location).map((d) => <option key={d.id}>{d.name}</option>)}</select></Field>
+            <Field label="Department / branch"><select id="vf-dept" value={f.department} onChange={set('department')}>{(cfg?.departments || []).filter((d) => d.active || d.name === f.department).map((d) => <option key={d.id}>{d.name}</option>)}</select></Field>
+            <Field label="Current location"><select id="vf-loc" value={f.location} onChange={set('location')}>{(cfg?.locations || []).filter((d) => d.active || d.name === f.location).map((d) => <option key={d.id}>{d.name}</option>)}</select></Field>
             <Field label="Assigned category (use)"><select id="vf-use" value={f.usage} onChange={set('usage')}>{USAGE.map((c) => <option key={c}>{c}</option>)}</select></Field>
             <Field label="Responsible officer"><select id="vf-off" value={f.officer} onChange={set('officer')}>{fleetOfficers.map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}</select></Field>
             <Field label="Remarks" span={2}><input id="vf-rem" value={f.remarks} onChange={set('remarks')} /></Field>

@@ -10,6 +10,8 @@ import { storeFile, removeStored } from '../storage.js';
 import { notify } from '../jobs.js';
 import { cfg, loadConfig, publicConfig } from '../config.js';
 import { ROLES, iso, fmt } from '@adroit/core/src/core/shared.js';
+import path from 'node:path';
+import { env } from '../env.js';
 
 const opt = z.string().trim().max(300).optional().nullable().transform((v) => (v === '' ? null : v));
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable().or(z.literal('').transform(() => null));
@@ -25,10 +27,10 @@ export const EmployeeInput = z.object({
   emergencyContact: opt, homeAddress: opt, notes: opt,
   docs: z.array(z.object({ type: z.string(), ref: z.string().optional().nullable(), issuer: z.string().optional().nullable(), issued: z.string().optional().nullable(), expiry: z.string().optional().nullable() })).optional(),
 });
-const COLS: Record<string, string> = { empCode: 'emp_code', molId: 'mol_id', name: 'name', gender: 'gender', nationality: 'nationality', dob: 'dob', department: 'department', location: 'location', designation: 'designation',
+const COLS: Record<string, string> = { empNo: 'emp_no', empCode: 'emp_code', molId: 'mol_id', name: 'name', gender: 'gender', nationality: 'nationality', dob: 'dob', department: 'department', location: 'location', designation: 'designation',
   mobile: 'mobile', email: 'email', status: 'status', joined: 'joined', company: 'company', sponsor: 'sponsor', deptHead: 'dept_head', insurancePlan: 'insurance_plan',
   insuranceProvider: 'insurance_provider', emergencyContact: 'emergency_contact', homeAddress: 'home_address', notes: 'notes' };
-const LABELS = { empCode: 'employee code', molId: 'Emp (MOL) ID', name: 'name', status: 'status', department: 'department', location: 'location', company: 'operational company', sponsor: 'visa sponsor', designation: 'designation', joined: 'joining date' };
+const LABELS = { empNo: 'employee number', empCode: 'employee code', molId: 'Emp (MOL) ID', name: 'name', status: 'status', department: 'department', location: 'location', company: 'operational company', sponsor: 'visa sponsor', designation: 'designation', joined: 'joining date' };
 
 // uniqueness checks with readable messages (the database also enforces them)
 export async function checkEmployeeKeys(c: any, b: { empNo?: string | null; molId?: string | null }, exceptUid?: string) {
@@ -45,7 +47,7 @@ export async function createEmployee(c: any, user: any, actor: any, b: z.infer<t
   if (!empNo) throw bad('Enter the employee number.');
   await checkEmployeeKeys(c, { empNo, molId: b.molId });
   const head = b.deptHead || (await one<any>('SELECT dept_head FROM employees WHERE department = $1 AND dept_head IS NOT NULL LIMIT 1', [b.department], c))?.dept_head || null;
-  const keys = Object.keys(COLS).filter((k) => k !== 'deptHead');
+  const keys = Object.keys(COLS).filter((k) => k !== 'deptHead' && k !== 'empNo');
   const e = await one<any>(
     `INSERT INTO employees (emp_no, ${keys.map((k) => COLS[k]).join(', ')}, dept_head, created_by, updated_by)
      VALUES ($1, ${keys.map((_, i) => `$${i + 2}`).join(', ')}, $${keys.length + 2}, $${keys.length + 3}, $${keys.length + 3}) RETURNING *`,
@@ -82,9 +84,10 @@ export default async function hrRoutes(app: FastifyInstance) {
   app.put('/api/employees/:no', async (req) => {
     assert(can(req.user, 'editEmployee'));
     const b = EmployeeInput.parse(req.body);
+    if (!b.empNo) throw bad('Enter the employee number.');
     const cur = await employeeRow(req.user, decodeURIComponent((req.params as any).no));
     await tx(async (c) => {
-      await checkEmployeeKeys(c, { molId: b.molId }, cur.id);
+      await checkEmployeeKeys(c, { empNo: b.empNo, molId: b.molId }, cur.id);
       const keys = Object.keys(COLS);
       await c.query(`UPDATE employees SET ${keys.map((k, i) => `${COLS[k]} = $${i + 2}`).join(', ')}, updated_by = $${keys.length + 2}, updated_at = now() WHERE id = $1`,
         [cur.id, ...keys.map((k) => (b as any)[k] ?? null), req.actor.name]);
@@ -100,6 +103,42 @@ export default async function hrRoutes(app: FastifyInstance) {
       }
     });
     return getEmployeeOut(req.user, cur.id);
+  });
+
+  app.delete('/api/employees/:no', async (req) => {
+    assert(can(req.user, 'editEmployee'));
+    const cur = await employeeRow(req.user, decodeURIComponent((req.params as any).no));
+
+    // Collect stored file keys before deletion for physical unlink after commit
+    const files = await q<{ storage_key: string }>(
+      `SELECT storage_key FROM files WHERE (owner_module = 'hr' AND owner_id = $1) OR id = $2`,
+      [cur.id, cur.photo_file_id || '00000000-0000-0000-0000-000000000000']
+    );
+
+    await tx(async (c) => {
+      // 1. Delete leave events for leave requests of this employee
+      await c.query(`DELETE FROM leave_events WHERE leave_id IN (SELECT id FROM leave_requests WHERE employee_id = $1)`, [cur.id]);
+      // 2. Delete leave requests
+      await c.query(`DELETE FROM leave_requests WHERE employee_id = $1`, [cur.id]);
+      // 3. Delete documents (document_versions and expiry_actions cascade on documents delete)
+      await c.query(`DELETE FROM documents WHERE owner_module = 'hr' AND owner_id = $1`, [cur.id]);
+      // 4. Nullify photo foreign key and delete files rows
+      await c.query(`UPDATE employees SET photo_file_id = NULL WHERE id = $1`, [cur.id]);
+      await c.query(`DELETE FROM files WHERE (owner_module = 'hr' AND owner_id = $1) OR id = $2`, [cur.id, cur.photo_file_id || '00000000-0000-0000-0000-000000000000']);
+      // 5. Delete employee record
+      await c.query(`DELETE FROM employees WHERE id = $1`, [cur.id]);
+      // 6. Audit entry
+      await audit(c, req.actor, 'Delete', 'Employee', cur.emp_no, `Employee ${cur.name} (${cur.emp_no}) deleted`, cur, null);
+    });
+
+    // Clean up physical disk files
+    for (const f of files) {
+      if (f.storage_key) {
+        await removeStored(path.join(env.filesDir, f.storage_key));
+      }
+    }
+
+    return { ok: true, id: cur.id, empNo: cur.emp_no };
   });
 
   app.post('/api/employees/:no/photo', async (req) => {
