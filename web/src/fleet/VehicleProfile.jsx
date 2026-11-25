@@ -91,13 +91,13 @@ export default function VehicleProfile({ param }) {
         <thead><tr><th>Document</th><th>Reference / policy no.</th><th>Expiry date</th><th>Status</th><th>Action</th><th className="right">Digital copy</th></tr></thead>
         <tbody>
           {docs.map((d) => (
-            <tr key={d.type}>
+            <tr key={d.docId || d.type}>
               <td><strong>{d.name}</strong>{d.name !== d.type && <small className="block muted">{d.type}</small>}</td>
               <td className="mono">{d.ref}</td>
               <td className="mono nowrap">{fmt(d.expiry)}</td>
               <td><StatusPill doc={d} /></td>
               <td><ActionPill status={actionStatus(d)} /></td>
-              <td className="right">{d.file ? <button className="btn btn-sm" onClick={() => setViewing(d)}><Icon n="eye" size={14} /> View</button> : can(u, 'uploadDoc', { type: d.type }) ? <button className="btn btn-sm btn-ghost" onClick={() => setUpload({ type: d.type, mode: 'upload' })}><Icon n="upload" size={14} /> Upload</button> : <span className="muted small">No scan</span>}</td>
+              <td className="right">{d.file ? <button className="btn btn-sm" onClick={() => setViewing(d)}><Icon n="eye" size={14} /> View</button> : can(u, 'uploadDoc', { type: d.type }) ? <button className="btn btn-sm btn-ghost" onClick={() => setUpload({ type: d.type, docId: d.docId, mode: 'upload' })}><Icon n="upload" size={14} /> Upload</button> : <span className="muted small">No scan</span>}</td>
             </tr>
           ))}
           {miss.filter((m) => !m.recorded).map((m) => (
@@ -182,7 +182,7 @@ export default function VehicleProfile({ param }) {
       </section>
 
       {viewing && <DocViewer owner={asset} module="fleet" doc={viewing} onClose={() => setViewing(null)} />}
-      {upload && <UploadDocModal module="fleet" owner={asset} docType={upload.type} mode={upload.mode} onClose={() => setUpload(null)} />}
+      {upload && <UploadDocModal module="fleet" owner={asset} docType={upload.type} docId={upload.docId} mode={upload.mode} onClose={() => setUpload(null)} />}
       {tracking && <RenewalActionModal module="fleet" owner={asset} doc={tracking} onClose={() => setTracking(null)} />}
     </div>
   );

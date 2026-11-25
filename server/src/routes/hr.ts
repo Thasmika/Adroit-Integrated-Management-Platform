@@ -94,12 +94,12 @@ export default async function hrRoutes(app: FastifyInstance) {
       const before = Object.fromEntries(Object.entries(COLS).map(([k, col]) => [k, cur[col]]));
       await audit(c, req.actor, 'Update', 'Employee', cur.emp_no, diffText(before, b, LABELS) || 'Profile details updated', before, b);
       // document numbers / dates edited on the form update the current version (renewals go through Renew)
-      const docs = await q<any>(`SELECT d.type, v.ref, v.issued, v.expiry FROM documents d JOIN document_versions v ON v.document_id = d.id AND v.is_current WHERE d.owner_module = 'hr' AND d.owner_id = $1`, [cur.id], c);
+      const docs = await q<any>(`SELECT d.id, d.type, v.ref, v.issued, v.expiry FROM documents d JOIN document_versions v ON v.document_id = d.id AND v.is_current WHERE d.owner_module = 'hr' AND d.owner_id = $1`, [cur.id], c);
       for (const d of b.docs || []) {
         const ex = docs.find((x) => x.type === d.type);
         if (!ex && !d.ref && !d.expiry) continue;
         if (ex && (d.ref || '') === (ex.ref || '') && (d.issued || '') === (ex.issued || '') && (d.expiry || '') === (ex.expiry || '')) continue;
-        await saveDocument(c, req.user, req.actor, 'hr', { uid: cur.id, no: cur.emp_no, label: b.name }, d.type, 'upload', { ref: d.ref || '', issued: d.issued || '', expiry: d.expiry || '' }, null);
+        await saveDocument(c, req.user, req.actor, 'hr', { uid: cur.id, no: cur.emp_no, label: b.name }, d.type, 'upload', { ref: d.ref || '', issued: d.issued || '', expiry: d.expiry || '', docId: ex?.id }, null);
       }
     });
     return getEmployeeOut(req.user, cur.id);
@@ -193,6 +193,21 @@ export default async function hrRoutes(app: FastifyInstance) {
     return publicConfig(req.user);
   });
 
+  // New HR document type, added from the employee "Add document" dialog (HR or System Administrator)
+  app.post('/api/doc-types', { preHandler: requireUser }, async (req) => {
+    assert(can(req.user, 'editEmployee'));
+    const b = z.object({ name: z.string().trim().min(2).max(60), expires: z.boolean().default(false) }).parse(req.body);
+    if (cfg().docTypes.some((t) => t.key.toLowerCase() === b.name.toLowerCase())) throw new HttpError(409, `A document type called "${b.name}" already exists.`, 'duplicate');
+    const short = (b.name.match(/\b[A-Za-z0-9]/g) || []).join('').toUpperCase().slice(0, 5) || 'DOC';
+    const sort = Math.max(0, ...cfg().docTypes.map((t) => t.sort || 0)) + 1;
+    const officer = cfg().docTypes.find((t) => t.key === 'Passport')?.officer || null;
+    await pool.query(`INSERT INTO document_types (key, module, short, expires, required, required_for, urgent_days, due_days, monitor_days, officer_user_id, sort, multi)
+      VALUES ($1, 'hr', $2, $3, false, '{}', 30, 60, 90, $4, $5, true)`, [b.name, short, b.expires, officer, sort]);
+    await audit(null, req.actor, 'Configure', 'Document type', b.name, `Added (HR${b.expires ? ', with expiry' : ', no expiry'})`);
+    await loadConfig();
+    return publicConfig(req.user);
+  });
+
   // ---------- Leave & Rejoining (§7) ----------
   app.get('/api/leave', async (req) => {
     const { leaves } = await scopedData(req.user);
@@ -200,7 +215,7 @@ export default async function hrRoutes(app: FastifyInstance) {
   });
 
   const LeaveInput = z.object({
-    empId: z.string(), type: z.enum(['Annual Leave', 'Emergency Leave', 'Sick Leave']),
+    empId: z.string(), type: z.string().trim().min(2).max(60),
     start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     reason: z.string().trim().min(2, 'Enter the reason or remarks.').max(500), contactAbroad: z.string().max(100).optional().nullable(),
   });
@@ -233,6 +248,20 @@ export default async function hrRoutes(app: FastifyInstance) {
     reject: { perm: 'reject', from: ['Pending HR Review', 'Pending Approval'], to: () => 'Rejected', label: 'Reject' },
     rejoin: { perm: 'rejoin', from: ['On Leave', 'Awaiting Rejoining'], to: () => 'Completed', label: 'Rejoin' },
   };
+
+  // Delete a leave application (HR or System Administrator); its history events cascade, the audit log keeps a copy
+  app.delete('/api/leave/:id', async (req) => {
+    assert(can(req.user, 'editEmployee'));
+    const id = decodeURIComponent((req.params as any).id);
+    await tx(async (c) => {
+      const l = await one<any>('SELECT l.*, e.emp_no, e.name FROM leave_requests l JOIN employees e ON e.id = l.employee_id WHERE l.id = $1 FOR UPDATE OF l', [id], c);
+      if (!l) throw new HttpError(404, 'Leave request not found.');
+      await employeeRow(req.user, l.emp_no, c);   // scope check
+      await c.query('DELETE FROM leave_requests WHERE id = $1', [id]);
+      await audit(c, req.actor, 'Delete', 'Leave request', l.emp_no, `${l.id} ${l.type} for ${l.name} (${fmt(l.start_date)} – ${fmt(l.end_date)}, ${l.status}) deleted`, l, null);
+    });
+    return { ok: true, id };
+  });
 
   app.post('/api/leave/:id/:action', async (req) => {
     const { id, action } = req.params as any;

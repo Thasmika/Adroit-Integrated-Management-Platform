@@ -10,6 +10,7 @@ import RejoinedReportModal from './RejoinedReportModal.jsx';
 import VacationReportModal from './VacationReportModal.jsx';
 import RejectedReportModal from './RejectedReportModal.jsx';
 import { LEAVE_TYPES, DEPARTMENTS, leaveTaken, empParam } from './data.js';
+import { withLookup } from '../core/AddableSelect.jsx';
 
 const STEPS = ['Leave request', 'HR review', 'Approval', 'Vacation', 'Rejoining', 'History'];
 const stepOf = (s) => ({ 'Pending HR Review': 1, 'Pending Approval': 2, Approved: 3, 'On Leave': 3, 'Awaiting Rejoining': 4, Completed: 5, Rejected: 5 }[s] ?? 0);
@@ -28,6 +29,9 @@ export default function Leave({ initialTab }) {
   const [showVacationReportModal, setShowVacationReportModal] = useState(false);
   const [showRejectedReportModal, setShowRejectedReportModal] = useState(false);
   const [printingLeave, setPrintingLeave] = useState(null); // { leave, emp }
+  const [delLeave, setDelLeave] = useState(null);
+  const [delBusy, setDelBusy] = useState(false);
+  const canDel = can(u, 'editEmployee');
 
   useEffect(() => {
     if (validTabs.includes(initialTab)) setTab(initialTab);
@@ -185,6 +189,7 @@ export default function Leave({ initialTab }) {
                   <button className="btn btn-sm btn-ghost" onClick={() => setPrintingLeave({ leave: l, emp: e })}>
                     <Icon n="download" size={14} /> Print Application
                   </button>
+                  {canDel && <button className="btn btn-sm btn-ghost danger-btn" onClick={() => setDelLeave(l)}><Icon n="trash" size={14} /> Delete</button>}
                   {(() => {
                     const canAct = l.status === 'Pending HR Review' ? can(u, 'reviewLeave') : can(u, 'approveLeave');
                     if (!canAct) return <p className="muted small right">Waiting for {l.status === 'Pending HR Review' ? 'HR review' : 'Management approval'}.</p>;
@@ -253,6 +258,7 @@ export default function Leave({ initialTab }) {
                       <button className="btn btn-sm btn-ghost" onClick={() => setPrintingLeave({ leave: l, emp: emp(l.empId) })}>
                         <Icon n="download" size={14} /> Print
                       </button>
+                  {canDel && <button className="btn btn-sm btn-ghost danger-btn" onClick={() => setDelLeave(l)}><Icon n="trash" size={14} /> Delete</button>}
                       <button className="btn btn-sm btn-primary" onClick={() => setActing({ leave: l, action: 'rejoin' })}>Add Rejoining</button>
                     </td>
                   </tr>
@@ -290,6 +296,7 @@ export default function Leave({ initialTab }) {
                         <button className="btn btn-sm btn-ghost" onClick={() => setPrintingLeave({ leave: l, emp: e })}>
                           <Icon n="download" size={14} /> Print
                         </button>
+                  {canDel && <button className="btn btn-sm btn-ghost danger-btn" onClick={() => setDelLeave(l)}><Icon n="trash" size={14} /> Delete</button>}
                         <button className="btn btn-sm" onClick={() => setActing({ leave: l, action: 'rejoin' })}>Add Rejoining</button>
                       </td>
                     </tr>
@@ -317,6 +324,7 @@ export default function Leave({ initialTab }) {
                     <button className="btn btn-sm btn-ghost" onClick={() => setPrintingLeave({ leave: l, emp: emp(l.empId) })}>
                       <Icon n="download" size={14} /> Print
                     </button>
+                  {canDel && <button className="btn btn-sm btn-ghost danger-btn" onClick={() => setDelLeave(l)}><Icon n="trash" size={14} /> Delete</button>}
                   </td>
                 </tr>
               ))}</tbody>
@@ -391,6 +399,7 @@ export default function Leave({ initialTab }) {
                       <button className="btn btn-sm btn-ghost" onClick={() => setPrintingLeave({ leave: l, emp: emp(l.empId) })}>
                         <Icon n="download" size={14} /> Print
                       </button>
+                  {canDel && <button className="btn btn-sm btn-ghost danger-btn" onClick={() => setDelLeave(l)}><Icon n="trash" size={14} /> Delete</button>}
                     </td>
                   </tr>
                 ))
@@ -407,8 +416,8 @@ export default function Leave({ initialTab }) {
         <section className="panel flush">
           <div className="panel-tools" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <select id="h-type" value={fType} onChange={(e) => setFType(e.target.value)} aria-label="Leave type"><option value="">All leave types</option>{LEAVE_TYPES.map((t) => <option key={t}>{t}</option>)}</select>
-              <select id="h-dept" value={fDept} onChange={(e) => setFDept(e.target.value)} aria-label="Department"><option value="">All departments</option>{DEPARTMENTS.map((d) => <option key={d}>{d}</option>)}</select>
+              <select id="h-type" value={fType} onChange={(e) => setFType(e.target.value)} aria-label="Leave type"><option value="">All leave types</option>{withLookup(state.config, 'leaveType', LEAVE_TYPES).map((t) => <option key={t}>{t}</option>)}</select>
+              <select id="h-dept" value={fDept} onChange={(e) => setFDept(e.target.value)} aria-label="Department"><option value="">All departments</option>{(state.config.departments?.map((d) => d.name) || DEPARTMENTS).map((d) => <option key={d}>{d}</option>)}</select>
               <select id="h-status" value={fStatus} onChange={(e) => setFStatus(e.target.value)} aria-label="Status"><option value="">All statuses</option>{['Pending HR Review', 'Pending Approval', 'Approved', 'On Leave', 'Awaiting Rejoining', 'Completed', 'Rejected'].map((t) => <option key={t}>{t}</option>)}</select>
             </div>
             <button className="btn btn-sm btn-secondary" onClick={() => setShowRejoinedReportModal(true)}>
@@ -431,6 +440,7 @@ export default function Leave({ initialTab }) {
                   <button className="btn btn-sm btn-ghost" onClick={() => setPrintingLeave({ leave: l, emp: emp(l.empId) })}>
                     <Icon n="download" size={14} /> Print
                   </button>
+                  {canDel && <button className="btn btn-sm btn-ghost danger-btn" onClick={() => setDelLeave(l)}><Icon n="trash" size={14} /> Delete</button>}
                 </td>
               </tr>
             ))}</tbody>
@@ -452,6 +462,22 @@ export default function Leave({ initialTab }) {
 
       {/* Item 4: Rejected Report Modal */}
       {showRejectedReportModal && <RejectedReportModal onClose={() => setShowRejectedReportModal(false)} />}
+
+      {delLeave && (
+        <Modal title="Delete leave application" onClose={() => !delBusy && setDelLeave(null)}>
+          <div className="stack pad">
+            <p>Delete leave application <strong className="mono">{delLeave.id}</strong> ({delLeave.type}, {fmt(delLeave.start)} – {fmt(delLeave.end)}, {delLeave.days} days, <strong>{delLeave.status}</strong>) for <strong>{emp(delLeave.empId)?.name}</strong>?</p>
+            <p className="muted small">The application and its approval history are removed. A copy is kept in the audit log.</p>
+            <div className="btn-row end" style={{ marginTop: '16px' }}>
+              <button className="btn" disabled={delBusy} onClick={() => setDelLeave(null)}>Cancel</button>
+              <button className="btn btn-primary" style={{ background: 'var(--red, #b91c1c)', borderColor: 'var(--red, #b91c1c)', color: '#fff' }} disabled={delBusy}
+                onClick={async () => { setDelBusy(true); if (await run(() => act.deleteLeave(delLeave.id), `Leave application ${delLeave.id} deleted`)) setDelLeave(null); setDelBusy(false); }}>
+                {delBusy ? 'Deleting…' : 'Yes, delete leave'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Item 3: Print Modal */}
       {printingLeave && (

@@ -3,9 +3,11 @@ import { useStore, go } from '../core/store.jsx';
 import { OPERATING, docTypes } from '../core/shared.js';
 import { can } from '../core/access.js';
 import { Field, Icon, Empty, DateInput } from '../core/ui.jsx';
+import { AddableSelect, withLookup } from '../core/AddableSelect.jsx';
 import { empIdFromParam, empParam, HR_STATUSES, SPONSORS } from './data.js';
 
 const NATS = ['Indian', 'Pakistani', 'Sri Lankan', 'Filipino', 'Bangladeshi', 'Nepali', 'Egyptian', 'Jordanian', 'Emirati', 'Other'];
+const PLANS = ['Group Health Insurance', 'Group Health Insurance – Enhanced'];
 const EXP_TYPES = ['Passport', 'Employment Visa', 'Emirates ID', 'Labour Card', 'Health Insurance'];
 
 export default function EmployeeForm({ param }) {
@@ -79,7 +81,7 @@ export default function EmployeeForm({ param }) {
           <div className="form-grid cols-3">
             <Field label="Full name (as in passport)" span={2}><input id="ef-name" value={f.name} onChange={set('name')} required /></Field>
             <Field label="Gender"><select id="ef-gender" value={f.gender} onChange={set('gender')}><option>Male</option><option>Female</option></select></Field>
-            <Field label="Nationality"><select id="ef-nat" value={f.nationality} onChange={set('nationality')}>{NATS.map((n) => <option key={n}>{n}</option>)}</select></Field>
+            <Field label="Nationality"><AddableSelect id="ef-nat" value={f.nationality} onChange={set('nationality')} options={withLookup(cfg, 'nationality', NATS)} onAdd={(v) => act.addLookup('nationality', v)} placeholder="New nationality, e.g. Sudanese" /></Field>
             <Field label="Date of birth"><DateInput id="ef-dob" value={f.dob} onChange={set('dob')} /></Field>
             <Field label="Mobile No"><input id="ef-mobile" value={f.mobile} onChange={set('mobile')} /></Field>
             <Field label="Email"><input id="ef-email" type="email" value={f.email} onChange={set('email')} /></Field>
@@ -93,9 +95,9 @@ export default function EmployeeForm({ param }) {
             <Field label="Designation"><input id="ef-desig" value={f.designation} onChange={set('designation')} required /></Field>
             <Field label="Joining date"><DateInput id="ef-joined" value={f.joined} onChange={set('joined')} required /></Field>
             <Field label="Employment status"><select id="ef-status" value={f.status} onChange={set('status')}>{(HR_STATUSES.includes(f.status) ? HR_STATUSES : [f.status, ...HR_STATUSES]).map((s) => <option key={s}>{s}</option>)}</select></Field>
-            <Field label="Department"><select id="ef-dept" value={f.department} onChange={set('department')}>{cfg.departments.filter((d) => d.active || d.name === f.department).map((d) => <option key={d.id}>{d.name}</option>)}</select></Field>
-            <Field label="Operational company"><select id="ef-co" value={f.company} onChange={set('company')}>{(cfg?.companies || []).filter((c) => c.active || c.name === f.company).map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></Field>
-            <Field label="Visa sponsoring company" hint="Visa may be under Adroit or another group company."><select id="ef-sponsor" value={f.sponsor} onChange={set('sponsor')}>{(cfg?.companies || []).filter((c) => c.active || c.name === f.sponsor).map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></Field>
+            <Field label="Department"><AddableSelect id="ef-dept" value={f.department} onChange={set('department')} options={cfg.departments.filter((d) => d.active || d.name === f.department).map((d) => d.name)} onAdd={(v) => act.quickAdd('departments', { name: v })} placeholder="New department name" /></Field>
+            <Field label="Operational company"><AddableSelect id="ef-co" value={f.company} onChange={set('company')} options={(cfg?.companies || []).filter((c) => (c.active && c.name !== 'Other') || c.name === f.company).map((c) => c.name)} onAdd={(v) => act.quickAdd('companies', { name: v })} placeholder="New company name" /></Field>
+            <Field label="Visa sponsoring company" hint="Visa may be under Adroit or another group company."><AddableSelect id="ef-sponsor" value={f.sponsor} onChange={set('sponsor')} options={(cfg?.companies || []).filter((c) => c.active || c.name === f.sponsor).map((c) => c.name)} onAdd={(v) => act.quickAdd('companies', { name: v })} placeholder="New sponsoring company name" /></Field>
             <Field label="Company MOL code" hint="Auto-filled from MOL Register"><input id="ef-co-mol" value={(cfg?.companies || []).find((c) => c.name === f.sponsor)?.molCode || ''} disabled /></Field>
             <Field label="Notes"><input id="ef-notes" value={f.notes} onChange={set('notes')} /></Field>
           </div>
@@ -103,7 +105,7 @@ export default function EmployeeForm({ param }) {
         <fieldset className="panel">
           <legend>Insurance</legend>
           <div className="form-grid cols-3">
-            <Field label="Plan"><select id="ef-plan" value={f.insurancePlan} onChange={set('insurancePlan')}><option>Group Health Insurance</option><option>Group Health Insurance – Enhanced</option></select></Field>
+            <Field label="Plan"><AddableSelect id="ef-plan" value={f.insurancePlan} onChange={set('insurancePlan')} options={withLookup(cfg, 'insurancePlan', PLANS)} onAdd={(v) => act.addLookup('insurancePlan', v)} placeholder="New insurance plan" /></Field>
             <Field label="Provider"><input id="ef-prov" value={f.insuranceProvider} onChange={set('insuranceProvider')} placeholder="e.g. Daman" /></Field>
             <Field label="Policy / member no."><input id="ef-no-HealthInsurance" value={doc('Health Insurance').ref} onChange={setDoc('Health Insurance', 'ref')} /></Field>
           </div>

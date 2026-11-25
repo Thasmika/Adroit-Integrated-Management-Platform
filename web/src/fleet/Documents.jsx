@@ -4,6 +4,8 @@ import { fmt, officerFor, actionStatus, docTypes } from '../core/shared.js';
 import { scopeAssets, canSeeDoc, can } from '../core/access.js';
 import { Icon, Tabs, StatusPill, DocViewer, Avatar, Empty, VehicleArt, ActionPill } from '../core/ui.jsx';
 import { UploadDocModal, RenewalActionModal } from '../core/docModals.jsx';
+import { reportExporter, WIN_LABEL } from '../core/export.js';
+import { ExportButtons, statusText } from '../core/ExportButtons.jsx';
 import { fleetExpiryRows as expiryRows, CATEGORIES, CAT_SHORT, missingDocs, expiryState, assetParam } from './data.js';
 
 const TABS = ['expiry', 'alerts', 'library', 'missing'];
@@ -45,8 +47,33 @@ export default function Documents({ initialTab }) {
     return out;
   }, [A, q, libType]);
 
-  const fresh = (r) => state.assets.find((a) => a.id === r.asset.id).docs.find((d) => d.type === r.doc.type);
+  const fresh = (r) => state.assets.find((a) => a.id === r.asset.id).docs.find((d) => (r.doc.docId ? d.docId === r.doc.docId : d.type === r.doc.type));
   const freshAsset = (id) => state.assets.find((a) => a.id === id);
+
+  const HEADERS = ['Fleet No', 'Plate / Body', 'Category', 'Make / Model', 'Registered Company', 'Location', 'Document', 'Reference', 'Expiry', 'Status', 'Action Status', 'Responsible'];
+  const toRows = (list) => list.map((r) => [
+    r.asset.id, r.asset.plate || r.asset.body || '', r.asset.category || '', `${r.asset.make || ''} ${r.asset.model || ''}`.trim(), r.asset.company || '', r.asset.location || '',
+    r.doc.name || r.doc.type, r.doc.ref || '', fmt(r.doc.expiry), statusText(r.doc), actionStatus(r.doc), r.officer?.name || '',
+  ]);
+  const asOf = 'As of ' + fmt(new Date());
+  const subtitle = () => {
+    const p = [WIN_LABEL[win] || `Within ${win} days`, 'Documents: ' + (types.length === DOC_TYPES.length ? 'All' : types.join(', ') || 'None')];
+    if (cat) p.push('Category: ' + cat);
+    if (officer) p.push('Officer: ' + (OFFICERS.find((o) => o.id === officer)?.name || officer));
+    if (act) p.push('Action: ' + act);
+    if (company) p.push('Company: ' + company);
+    if (loc) p.push('Location: ' + loc);
+    p.push(asOf);
+    return p.join(' · ');
+  };
+  const expiryExp = reportExporter({ name: `Fleet-Document-Expiry-${win === 0 ? 'Expired' : win + 'days'}`, title: 'Fleet Document Expiry Report', subtitle: subtitle(), sheet: 'Expiry', headers: HEADERS, rows: toRows(rows), statusCol: 9, by: u.name });
+  const mineExp = reportExporter({ name: 'Fleet-Documents-Assigned', title: (me ? `Fleet Documents Assigned to ${u.name}` : 'Fleet Document Alerts') + ' · Next 60 Days', subtitle: asOf, sheet: 'Assigned', headers: HEADERS, rows: toRows(mine), statusCol: 9, by: u.name });
+  const missingExp = reportExporter({
+    name: 'Fleet-Missing-Documents', title: 'Fleet Missing Documents Report', subtitle: asOf, sheet: 'Missing',
+    headers: ['Fleet No', 'Plate / Body', 'Category', 'Make / Model', 'Location', 'Document', 'Problem'],
+    rows: missing.map((m) => [m.asset.id, m.asset.plate || m.asset.body || '', m.asset.category || '', `${m.asset.make || ''} ${m.asset.model || ''}`.trim(), m.asset.location || '', m.doc?.name || m.type, m.recorded ? 'Recorded, no scanned copy' : 'Required, not recorded']),
+    statusCol: 6, by: u.name,
+  });
 
   const ExpiryTable = ({ list, showOfficer = true }) => (
     <div className="table-wrap">
@@ -54,8 +81,8 @@ export default function Documents({ initialTab }) {
         <thead><tr><th>Asset</th><th>Document</th><th>Expiry</th><th>Status</th><th>Action tracking</th><th className="right">Action</th></tr></thead>
         <tbody>
           {list.map((r, i) => (
-            <tr key={r.asset.id + r.doc.type + i}>
-              <td><a className="who-row" href={'#fleet-vehicle.' + assetParam(r.asset.id)}><span className="art-chip"><VehicleArt category={r.asset.category} size={30} /></span><span className="who"><strong className="mono">{r.asset.id}</strong><small>{r.asset.plate || r.asset.body} · {CAT_SHORT[r.asset.category]}</small></span></a></td>
+            <tr key={r.doc.docId || r.asset.id + r.doc.type + i}>
+              <td><a className="who-row" href={'#fleet-vehicle.' + assetParam(r.asset.id)}><span className="art-chip"><VehicleArt category={r.asset.category} size={30} /></span><span className="who"><strong className="mono">{r.asset.id}</strong><small>{r.asset.plate || r.asset.body} · {CAT_SHORT[r.asset.category] || r.asset.category}</small></span></a></td>
               <td>{r.doc.name}<small className="block muted mono">{r.doc.ref}</small></td>
               <td className="mono nowrap">{fmt(r.doc.expiry)}</td>
               <td><StatusPill doc={r.doc} /></td>
@@ -63,7 +90,7 @@ export default function Documents({ initialTab }) {
               <td className="right nowrap actions">
                 {r.doc.file && <button className="btn btn-sm btn-ghost" onClick={() => setViewing(r)} aria-label="View scan"><Icon n="eye" size={14} /></button>}
                 {can(u, 'uploadDoc', { type: r.doc.type }) && <><button className="btn btn-sm" onClick={() => setTracking(r)}>Action</button>
-                <button className="btn btn-sm btn-primary" onClick={() => setUpload({ asset: r.asset, type: r.doc.type, mode: 'renew' })}>Renew</button></>}
+                <button className="btn btn-sm btn-primary" onClick={() => setUpload({ asset: r.asset, type: r.doc.type, docId: r.doc.docId, mode: 'renew' })}>Renew</button></>}
               </td>
             </tr>
           ))}
@@ -114,7 +141,7 @@ export default function Documents({ initialTab }) {
             <select id="ex-loc" value={loc} onChange={(e) => setLoc(e.target.value)} aria-label="Location"><option value="">All locations</option>{state.config.locations.map((l) => <option key={l.id}>{l.name}</option>)}</select>
           </div>
           <ExpiryTable list={rows} />
-          <div className="pager"><span className="muted small">{rows.length} documents {win === 0 ? 'already expired' : `expired or expiring within ${win} days`}</span></div>
+          <div className="pager"><span className="muted small">{rows.length} documents {win === 0 ? 'already expired' : `expired or expiring within ${win} days`}</span><ExportButtons exp={expiryExp} disabled={rows.length === 0} /></div>
         </section>
       )}
 
@@ -132,6 +159,7 @@ export default function Documents({ initialTab }) {
           <section className="panel flush">
             <div className="panel-head pad"><h2>{me ? 'Assigned to you' : 'All routed alerts'} · next 60 days</h2><span className="muted small">Alerts go out 90, 60, 30 and 7 days before expiry, then daily once expired.</span></div>
             <ExpiryTable list={mine} showOfficer={!me} />
+            <div className="pager"><span className="muted small">{mine.length} documents</span><ExportButtons exp={mineExp} disabled={mine.length === 0} /></div>
           </section>
         </div>
       )}
@@ -184,13 +212,14 @@ export default function Documents({ initialTab }) {
               </table>
             </div>
           )}
+          {missing.length > 0 && <div className="pager"><span className="muted small">{missing.length} missing documents</span><ExportButtons exp={missingExp} /></div>}
         </section>
       )}
 
       {viewing && <DocViewer owner={freshAsset(viewing.asset.id)} module="fleet" doc={fresh(viewing)} onClose={() => setViewing(null)} />}
       {tracking && <RenewalActionModal module="fleet" owner={freshAsset(tracking.asset.id)} doc={fresh(tracking)} onClose={() => setTracking(null)} />}
       {upload?.pick && <PickAsset onPick={(a) => setUpload({ asset: a, type: null, mode: 'upload' })} onClose={() => setUpload(null)} />}
-      {upload && !upload.pick && <UploadDocModal module="fleet" owner={freshAsset(upload.asset.id)} docType={upload.type} mode={upload.mode} onClose={() => setUpload(null)} />}
+      {upload && !upload.pick && <UploadDocModal module="fleet" owner={freshAsset(upload.asset.id)} docType={upload.type} docId={upload.docId} mode={upload.mode} onClose={() => setUpload(null)} />}
     </div>
   );
 }

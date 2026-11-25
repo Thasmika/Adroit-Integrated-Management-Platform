@@ -68,9 +68,9 @@ export default function Fleet({ initialCat }) {
           <Icon n="search" />
           <input id="fleet-search" value={q} onChange={f(setQ)} placeholder="Fleet no., plate, chassis, make, policy no.…" aria-label="Search fleet" />
         </div>
-        <select id="f-dept" value={dept} onChange={f(setDept)} aria-label="Department"><option value="">All departments</option>{DEPARTMENTS.map((d) => <option key={d}>{d}</option>)}</select>
-        <select id="f-loc" value={loc} onChange={f(setLoc)} aria-label="Location"><option value="">All locations</option>{LOCATIONS.map((d) => <option key={d}>{d}</option>)}</select>
-        <select id="f-co" value={company} onChange={f(setCompany)} aria-label="Registered company"><option value="">Any registered company</option>{COMPANIES.map((d) => <option key={d}>{d}</option>)}</select>
+        <select id="f-dept" value={dept} onChange={f(setDept)} aria-label="Department"><option value="">All departments</option>{(state.config.departments?.map((d) => d.name) || DEPARTMENTS).map((d) => <option key={d}>{d}</option>)}</select>
+        <select id="f-loc" value={loc} onChange={f(setLoc)} aria-label="Location"><option value="">All locations</option>{(state.config.locations?.map((d) => d.name) || LOCATIONS).map((d) => <option key={d}>{d}</option>)}</select>
+        <select id="f-co" value={company} onChange={f(setCompany)} aria-label="Registered company"><option value="">Any registered company</option>{(state.config.companies?.map((d) => d.name) || COMPANIES).map((d) => <option key={d}>{d}</option>)}</select>
         <select id="f-status" value={status} onChange={f(setStatus)} aria-label="Operational status"><option value="">Any status</option>{STATUSES.map((d) => <option key={d}>{d}</option>)}</select>
         <select id="f-comp" value={comp} onChange={f(setComp)} aria-label="Document compliance">
           <option value="">Any compliance</option><option value="valid">Compliant</option><option value="due">Renewal due ≤ 60 days</option><option value="missing">Missing document</option><option value="expired">Expired document</option>
@@ -93,7 +93,7 @@ export default function Fleet({ initialCat }) {
                         <div className="who"><a href={'#fleet-vehicle.' + assetParam(a.id)} onClick={(e) => e.stopPropagation()}><strong className="mono">{a.id}</strong></a><small>{a.make} {a.model} · {a.year}</small></div>
                       </div>
                     </td>
-                    <td>{CAT_SHORT[a.category]}<small className="block muted">{a.body}</small></td>
+                    <td>{CAT_SHORT[a.category] || a.category}<small className="block muted">{a.body}</small></td>
                     <td className="mono nowrap">{a.plate || <span className="muted">{a.vin}</span>}</td>
                     <td>{!isGroup(a.company) ? 'Adroit' : <span className="tag">{a.company.replace(' L.L.C', '')}</span>}</td>
                     <td>{a.department.replace(' Department', '')}<small className="block muted">{a.location}</small></td>

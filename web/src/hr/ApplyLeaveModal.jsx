@@ -5,6 +5,7 @@ import { iso, TODAY } from '../core/shared.js';
 import { scopeEmployees } from '../core/access.js';
 import { LEAVE_TYPES, leaveTaken } from './data.js';
 import LeavePrintModal from './LeavePrintModal.jsx';
+import { AddableSelect, withLookup } from '../core/AddableSelect.jsx';
 
 export default function ApplyLeaveModal({ emp: fixedEmp, onClose }) {
   const { state, act, notify } = useStore();
@@ -73,9 +74,8 @@ export default function ApplyLeaveModal({ emp: fixedEmp, onClose }) {
           </>
         )}
         <Field label="Leave type" span={2}>
-          <div className="seg">
-            {LEAVE_TYPES.map((t) => <button type="button" key={t} className={type === t ? 'on' : ''} onClick={() => setType(t)}>{t}</button>)}
-          </div>
+          <AddableSelect id="lv-type" value={type} onChange={(e) => setType(e.target.value)} options={withLookup(state.config, 'leaveType', LEAVE_TYPES)}
+            onAdd={(v) => act.addLookup('leaveType', v)} placeholder="New leave type, e.g. Maternity Leave" />
         </Field>
         <Field label="From"><DateInput id="lv-start" value={start} onChange={(e) => setStart(e.target.value)} /></Field>
         <Field label="To (last day of leave)"><DateInput id="lv-end" value={end} onChange={(e) => setEnd(e.target.value)} /></Field>

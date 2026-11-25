@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import { aiConfigured } from '../ai.js';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { requireUser, requireAdmin, requireAuditor, bad, hashPassword, passwordProblem, revokeUserSessions, HttpError } from '../auth.js';
+import { requireUser, requireAdmin, requireAuditor, can, bad, hashPassword, passwordProblem, revokeUserSessions, HttpError } from '../auth.js';
 import { q, one, pool, tx } from '../db.js';
 import { audit } from '../audit.js';
 import { cfg, loadConfig, publicConfig, SYSTEM_DEFAULTS } from '../config.js';
@@ -40,7 +40,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     if (!(next.urgent <= next.due && (next.monitor === 0 || next.due <= next.monitor))) throw bad('Thresholds must increase: urgent ≤ warning ≤ monitor.');
     if (b.officer) {
       const o = cfg().users.find((u) => u.id === b.officer);
-      if (!o || !o.active || !['hr', 'pro', 'insurance', 'fleet'].includes(o.role)) throw bad('The responsible officer must be an active HR, PRO, Insurance or Fleet user.');
+      if (!o || !o.active || !['hr', 'pro', 'insurance', 'fleet', 'sysadmin'].includes(o.role)) throw bad('The responsible officer must be an active HR, PRO, Insurance, Fleet or System Administrator user.');
     }
     if (b.requiredFor?.some((c) => !cfg().categories.some((x) => x.name === c))) throw bad('Unknown asset category.');
     await pool.query(`UPDATE document_types SET expires = $2, required = $3, required_for = $4, urgent_days = $5, due_days = $6, monitor_days = $7, officer_user_id = $8 WHERE key = $1`,
@@ -52,11 +52,12 @@ export default async function adminRoutes(app: FastifyInstance) {
   });
 
   // ---------- reference masters ----------
-  app.post('/api/admin/lists/:list', admin, async (req) => {
+  const addListItem = async (req: any) => {
     const L = LISTS[(req.params as any).list];
     if (!L) throw bad('Unknown list.');
     const b = z.object({ id: z.string().optional(), name: z.string().trim().min(2).max(120), short: z.string().max(80).optional(), kind: z.string().optional(), active: z.boolean().default(true) }).parse(req.body);
     const list = cfg()[(req.params as any).list as 'companies'];
+    if (list.some((x: any) => String(x.name).toLowerCase() === b.name.toLowerCase())) throw new HttpError(409, `"${b.name}" is already in the list.`, 'duplicate');
     if (L.table === 'asset_categories') {
       await pool.query('INSERT INTO asset_categories (name, active, sort) VALUES ($1,$2,$3)', [b.name, b.active, list.length]);
     } else {
@@ -66,6 +67,34 @@ export default async function adminRoutes(app: FastifyInstance) {
       else await pool.query(`INSERT INTO ${L.table} (id, name, active) VALUES ($1,$2,$3)`, [id, b.name, b.active]);
     }
     await audit(null, req.actor, 'Configure', L.entity, b.name, 'Added');
+    await loadConfig();
+    return publicConfig(req.user);
+  };
+  app.post('/api/admin/lists/:list', admin, addListItem);
+  // Quick add from a form's "+" button: HR users (companies, departments, locations) and Fleet users (also categories)
+  app.post('/api/lists/:list', { preHandler: requireUser }, async (req: any) => {
+    const list = (req.params as any).list;
+    const hr = can(req.user, 'editEmployee'), fleet = can(req.user, 'editAsset');
+    if (!(list === 'categories' ? fleet : hr || fleet)) throw new HttpError(403, "Your role can't add items to this list.");
+    return addListItem(req);
+  });
+
+  // ---------- extendable item lists (nationality, insurance plan, emirate, usage, leave type) ----------
+  const LOOKUPS: Record<string, (u: any) => boolean> = {
+    nationality: (u) => can(u, 'editEmployee'),
+    insurancePlan: (u) => can(u, 'editEmployee'),
+    leaveType: (u) => can(u, 'editEmployee') || can(u, 'submitLeave'),
+    emirate: (u) => can(u, 'editAsset'),
+    usage: (u) => can(u, 'editAsset'),
+  };
+  app.post('/api/lookups/:list', { preHandler: requireUser }, async (req: any) => {
+    const list = (req.params as any).list;
+    const allowed = LOOKUPS[list];
+    if (!allowed) throw bad('Unknown list.');
+    if (!allowed(req.user)) throw new HttpError(403, "Your role can't add items to this list.");
+    const b = z.object({ value: z.string().trim().min(2).max(80) }).parse(req.body);
+    const r = await pool.query('INSERT INTO lookup_values (list, value, created_by) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING', [list, b.value, req.actor.name]);
+    if (r.rowCount) await audit(null, req.actor, 'Configure', 'List item', b.value, `Added to ${list}`);
     await loadConfig();
     return publicConfig(req.user);
   });

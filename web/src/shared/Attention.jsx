@@ -39,7 +39,7 @@ export default function Attention({ }) {
   const officers = state.config.users.filter((x) => state.config.docTypes.some((t) => t.officer === x.id));
   const types = docTypes().filter((t) => !f.module || t.module === f.module);
   const count = (m, k) => all.filter((i) => (!m || i.module === m) && (k === 'missing' ? i.kind === 'missing' : i.kind === 'doc' && i.st.key === k)).length;
-  const fresh = (i) => { const list = i.module === 'hr' ? state.employees : state.assets; const o = list.find((x) => x.id === i.ownerId); return { owner: o, doc: o.docs.find((d) => d.type === i.type) }; };
+  const fresh = (i) => { const list = i.module === 'hr' ? state.employees : state.assets; const o = list.find((x) => x.id === i.ownerId); return { owner: o, doc: o.docs.find((d) => (i.doc?.docId ? d.docId === i.doc.docId : d.type === i.type)) }; };
   const active = Object.entries(f).filter(([k, v]) => v && !(k === 'range' && v === 'att')).length;
 
   return (
@@ -98,7 +98,7 @@ export default function Attention({ }) {
                     <td className="right nowrap actions">
                       {i.doc?.file && <button className="btn btn-sm btn-ghost" aria-label="View scan" onClick={() => setViewing(fresh(i) && { ...fresh(i), module: i.module })}><Icon n="eye" size={14} /></button>}
                       {ok && i.kind === 'doc' && <button className="btn btn-sm" onClick={() => setTracking({ ...fresh(i), module: i.module })}>Action</button>}
-                      {ok && <button className="btn btn-sm btn-primary" onClick={() => setUpload({ ...fresh(i), module: i.module, type: i.type, mode: i.kind === 'doc' ? 'renew' : 'upload' })}>{i.kind === 'doc' ? 'Renew' : 'Complete'}</button>}
+                      {ok && <button className="btn btn-sm btn-primary" onClick={() => setUpload({ ...fresh(i), module: i.module, type: i.type, docId: i.doc?.docId, mode: i.kind === 'doc' ? 'renew' : 'upload' })}>{i.kind === 'doc' ? 'Renew' : 'Complete'}</button>}
                       {!ok && <a className="btn btn-sm" href={i.link}>Open</a>}
                     </td>
                   </tr>
@@ -125,7 +125,7 @@ export default function Attention({ }) {
 
       {viewing && <DocViewer owner={viewing.owner} module={viewing.module} doc={viewing.doc} onClose={() => setViewing(null)} />}
       {tracking && <RenewalActionModal module={tracking.module} owner={tracking.owner} doc={tracking.doc} onClose={() => setTracking(null)} />}
-      {upload && <UploadDocModal module={upload.module} owner={upload.owner} docType={upload.type} mode={upload.mode} onClose={() => setUpload(null)} />}
+      {upload && <UploadDocModal module={upload.module} owner={upload.owner} docType={upload.type} docId={upload.docId} mode={upload.mode} onClose={() => setUpload(null)} />}
     </div>
   );
 }

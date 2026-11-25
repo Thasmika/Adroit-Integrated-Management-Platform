@@ -58,10 +58,11 @@ const CAT_ART = {
   'Other Company Vehicle': 'M5 30v-7l5-1 5-8h21l6 8h7a3 3 0 0 1 3 3v5z M21 14v8 M31 14v8',
 };
 const CAT_WHEELS = { 'Heavy Vehicle': [11, 25, 45], 'Light Vehicle': [15, 45], Trailer: [33, 42], 'Heavy Machine / Equipment': [24, 35], 'Other Company Vehicle': [15, 43] };
+// categories added by users (Administration or the "Add category" button) get the generic vehicle drawing
 export const VehicleArt = ({ category, size = 96 }) => (
   <svg className="vart" width={size} height={size * 0.66} viewBox="0 0 60 40" aria-hidden="true">
-    <path d={CAT_ART[category]} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" />
-    {CAT_WHEELS[category].map((x) => <circle key={x} cx={x} cy="33" r="4" fill="var(--surface)" stroke="currentColor" strokeWidth="2.2" />)}
+    <path d={CAT_ART[category] || CAT_ART['Other Company Vehicle']} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" />
+    {(CAT_WHEELS[category] || CAT_WHEELS['Other Company Vehicle']).map((x) => <circle key={x} cx={x} cy="33" r="4" fill="var(--surface)" stroke="currentColor" strokeWidth="2.2" />)}
   </svg>
 );
 

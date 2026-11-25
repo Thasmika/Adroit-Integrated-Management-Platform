@@ -25,6 +25,7 @@ export default function EmployeeProfile({ param }) {
   const [printingLeave, setPrintingLeave] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [delLeave, setDelLeave] = useState(null);
   if (!emp) return <div className="page"><Empty title="Employee not found or outside your access">Check the employee number, or go back to <a href="#hr-employees">Employees</a>.</Empty></div>;
 
   const limited = ROLES[u.role].noDocs;
@@ -203,13 +204,13 @@ export default function EmployeeProfile({ param }) {
                 <thead><tr><th>Document</th><th>Number</th><th>Expiry</th><th>Status</th><th>Action</th><th className="right">Digital copy</th></tr></thead>
                 <tbody>
                   {docs.map((d) => (
-                    <tr key={d.type}>
-                      <td><strong>{d.type}</strong>{d.history?.length > 0 && <small className="block muted">{d.history.length} previous version{d.history.length > 1 ? 's' : ''}</small>}</td>
+                    <tr key={d.docId || d.type}>
+                      <td><strong>{d.type}</strong>{d.name && d.name !== d.type && <small className="block">{d.name}</small>}{d.history?.length > 0 && <small className="block muted">{d.history.length} previous version{d.history.length > 1 ? 's' : ''}</small>}</td>
                       <td className="mono">{maskNo(d.ref, d.type)}</td>
                       <td className="mono nowrap">{fmt(d.expiry)}</td>
                       <td><StatusPill doc={d} /></td>
                       <td><ActionPill status={actionStatus(d)} /></td>
-                      <td className="right">{d.file ? <button className="btn btn-sm" onClick={() => setViewing(d)}><Icon n="eye" size={14} /> View</button> : can(u, 'uploadDoc', { type: d.type }) ? <button className="btn btn-sm btn-ghost" onClick={() => setUpload({ type: d.type, mode: 'upload' })}><Icon n="upload" size={14} /> Upload</button> : <span className="muted small">No scan</span>}</td>
+                      <td className="right">{d.file ? <button className="btn btn-sm" onClick={() => setViewing(d)}><Icon n="eye" size={14} /> View</button> : can(u, 'uploadDoc', { type: d.type }) ? <button className="btn btn-sm btn-ghost" onClick={() => setUpload({ type: d.type, docId: d.docId, mode: 'upload' })}><Icon n="upload" size={14} /> Upload</button> : <span className="muted small">No scan</span>}</td>
                     </tr>
                   ))}
                   {missing.filter((m) => !m.recorded).map((m) => <tr key={m.type}><td><strong>{m.type}</strong></td><td className="muted">—</td><td className="muted">—</td><td><span className="pill pill-missing">Not recorded</span></td><td><ActionPill status="Open" /></td><td className="right">{can(u, 'uploadDoc', { type: m.type }) && <button className="btn btn-sm btn-primary" onClick={() => setUpload({ type: m.type, mode: 'upload' })}><Icon n="plus" size={14} /> Record</button>}</td></tr>)}
@@ -230,7 +231,7 @@ export default function EmployeeProfile({ param }) {
             {leaves.length === 0 ? <Empty title="No leave recorded yet" /> : (
               <div className="table-wrap"><table className="table">
                 <thead><tr><th>Ref.</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th><th>Rejoined</th><th>Action</th></tr></thead>
-                <tbody>{leaves.map((l) => <tr key={l.id}><td className="mono small">{l.id}</td><td>{l.type}</td><td className="mono">{fmt(l.start)}</td><td className="mono">{fmt(l.end)}</td><td>{l.days}</td><td><LeavePill status={l.status} /></td><td className="mono">{fmt(l.rejoined)}</td><td><button className="btn btn-sm btn-ghost" onClick={() => setPrintingLeave(l)}><Icon n="download" size={14} /> Print</button></td></tr>)}</tbody>
+                <tbody>{leaves.map((l) => <tr key={l.id}><td className="mono small">{l.id}</td><td>{l.type}</td><td className="mono">{fmt(l.start)}</td><td className="mono">{fmt(l.end)}</td><td>{l.days}</td><td><LeavePill status={l.status} /></td><td className="mono">{fmt(l.rejoined)}</td><td className="nowrap"><button className="btn btn-sm btn-ghost" onClick={() => setPrintingLeave(l)}><Icon n="download" size={14} /> Print</button>{canEdit && <button className="btn btn-sm btn-ghost danger-btn" id={`lv-del-${l.id}`} onClick={() => setDelLeave(l)}><Icon n="trash" size={14} /> Delete</button>}</td></tr>)}</tbody>
               </table></div>
             )}
           </div>
@@ -238,10 +239,25 @@ export default function EmployeeProfile({ param }) {
       </section>
 
       {viewing && <DocViewer owner={emp} module="hr" doc={viewing} onClose={() => setViewing(null)} />}
-      {upload && <UploadDocModal module="hr" owner={emp} docType={upload.type} mode={upload.mode} onClose={() => setUpload(null)} />}
+      {upload && <UploadDocModal module="hr" owner={emp} docType={upload.type} docId={upload.docId} mode={upload.mode} onClose={() => setUpload(null)} />}
       {tracking && <RenewalActionModal module="hr" owner={emp} doc={tracking} onClose={() => setTracking(null)} />}
       {applying && <ApplyLeaveModal emp={emp} onClose={() => setApplying(false)} />}
       {printingLeave && <LeavePrintModal leave={printingLeave} emp={emp} close={() => setPrintingLeave(null)} />}
+      {delLeave && (
+        <Modal title="Delete leave application" onClose={() => !deleting && setDelLeave(null)}>
+          <div className="stack pad">
+            <p>Delete leave application <strong className="mono">{delLeave.id}</strong> ({delLeave.type}, {fmt(delLeave.start)} – {fmt(delLeave.end)}, {delLeave.days} days, <strong>{delLeave.status}</strong>) for <strong>{emp.name}</strong>?</p>
+            <p className="muted small">The application and its approval history are removed. A copy is kept in the audit log.</p>
+            <div className="btn-row end" style={{ marginTop: '16px' }}>
+              <button className="btn" disabled={deleting} onClick={() => setDelLeave(null)}>Cancel</button>
+              <button className="btn btn-primary" style={{ background: 'var(--red, #b91c1c)', borderColor: 'var(--red, #b91c1c)', color: '#fff' }} disabled={deleting}
+                onClick={async () => { setDeleting(true); try { await act.deleteLeave(delLeave.id); notify(`Leave application ${delLeave.id} deleted`); setDelLeave(null); } catch (x) { notify(x.message, 'error'); } setDeleting(false); }}>
+                {deleting ? 'Deleting…' : 'Yes, delete leave'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
       {confirmDelete && (
         <Modal title="Delete Employee" onClose={() => !deleting && setConfirmDelete(false)}>
           <div className="stack pad">

@@ -65,13 +65,13 @@ function Shell() {
       !ROLES[u.role].noDocs && { key: 'hr-documents', label: 'Documents & Expiry', icon: 'docs', badge: hrUrgent },
       { key: 'hr-leave', label: 'Leave & Rejoining', icon: 'leave', badge: pendingLeave },
       !ROLES[u.role].noDocs && { key: 'hr-mol', label: 'MOL Register', icon: 'idcard' },
-      ['hr', 'management', 'auditor'].includes(u.role) && { key: 'hr-reports', label: 'HR Reports', icon: 'reports' },
+      ['hr', 'management', 'auditor', 'sysadmin'].includes(u.role) && { key: 'hr-reports', label: 'HR Reports', icon: 'reports' },
     ] },
     fl && { title: 'Vehicle & Equipment', items: [
       { key: 'fleet-dashboard', label: 'Fleet Dashboard', icon: 'dashboard' },
       { key: 'fleet-master', label: 'Fleet Master', icon: 'truck', match: ['fleet-vehicle', 'fleet-new', 'fleet-edit', 'fleet-import'] },
       { key: 'fleet-documents', label: 'Documents & Expiry', icon: 'docs', badge: flUrgent },
-      ['fleet', 'management', 'auditor'].includes(u.role) && { key: 'fleet-reports', label: 'Fleet Reports', icon: 'reports' },
+      ['fleet', 'management', 'auditor', 'sysadmin'].includes(u.role) && { key: 'fleet-reports', label: 'Fleet Reports', icon: 'reports' },
     ] },
     (canAdmin(u) || canAudit(u)) && { title: 'Platform', items: [
       canAdmin(u) && { key: 'admin', label: 'Administration', icon: 'settings' },

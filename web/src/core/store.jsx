@@ -111,12 +111,13 @@ export function StoreProvider({ children }) {
       const o = await api('POST', `/api/documents/${module}/${enc(no)}/${enc(type)}`, fd);
       patchOwner(module, o); return o;
     },
-    async updateAction(module, no, type, status, note) {
-      const o = await api('PUT', `/api/actions/${module}/${enc(no)}/${enc(type)}`, { status, note });
+    async updateAction(module, no, type, status, note, docId) {
+      const o = await api('PUT', `/api/actions/${module}/${enc(no)}/${enc(type)}`, { status, note, ...(docId ? { docId } : {}) });
       patchOwner(module, o); return o;
     },
     // leave
     async submitLeave(leave) { const l = await api('POST', '/api/leave', leave); patch('leaves', l); return l; },
+    async deleteLeave(id) { await api('DELETE', `/api/leave/${enc(id)}`); setState((s) => ({ ...s, leaves: s.leaves.filter((l) => l.id !== id) })); },
     async leaveAction(id, action, body) { const l = await api('POST', `/api/leave/${enc(id)}/${action}`, body); patch('leaves', l); return l; },
     // AI, search, notifications, audit
     ask: (question) => api('POST', '/api/ai/ask', { question }),
@@ -125,11 +126,15 @@ export function StoreProvider({ children }) {
     async readAll() { await api('POST', '/api/notifications/read-all'); setUnread(0); },
     audit: (params) => api('GET', '/api/audit?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== '' && v != null))),
     assetHistory: (no) => api('GET', `/api/assets/${enc(no)}/history`),
-    actionHistory: (module, no, type) => api('GET', `/api/documents/${module}/${enc(no)}/${enc(type)}/actions`),
+    actionHistory: (module, no, type, docId) => api('GET', `/api/documents/${module}/${enc(no)}/${enc(type)}/actions${docId ? `?docId=${enc(docId)}` : ''}`),
     // administration
     async docType(key, p) { setCfg(await api('PUT', `/api/admin/doc-types/${enc(key)}`, p)); },
     // MOL register (Changes Report 01)
     async saveEmployeeMol(no, molId) { const e = await api('PUT', `/api/employees/${enc(no)}/mol`, { molId }); patch('employees', e); return e; },
+    // "+" buttons on dropdowns: masters (companies, departments, locations, categories) and extendable lists
+    async quickAdd(list, item) { setCfg(await api('POST', `/api/lists/${list}`, item)); },
+    async addLookup(list, value) { setCfg(await api('POST', `/api/lookups/${list}`, { value })); },
+    async addDocType(name, expires) { setCfg(await api('POST', '/api/doc-types', { name, expires })); },
     async saveCompanyMol(id, molCode) { const c = await api('PUT', `/api/companies/${enc(id)}/mol`, { molCode }); setCfg(c); return c; },
     async listAdd(list, item) { setCfg(await api('POST', `/api/admin/lists/${list}`, item)); },
     async listUpdate(list, key, p) { setCfg(await api('PUT', `/api/admin/lists/${list}/${enc(key)}`, p)); },

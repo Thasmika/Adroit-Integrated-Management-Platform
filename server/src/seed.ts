@@ -34,9 +34,9 @@ async function seedMasters(c: any, demo: boolean) {
 async function seedDocTypes(c: any, withOfficers: boolean) {
   for (const [i, t] of DOC_TYPES_INIT.entries()) {
     await c.query(
-      `INSERT INTO document_types (key, module, short, expires, required, required_for, urgent_days, due_days, monitor_days, officer_user_id, sort)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT DO NOTHING`,
-      [t.key, t.module, t.short, t.expires, !!t.required, (t as any).requiredFor || [], t.urgent, t.due, t.monitor, withOfficers ? t.officer : null, i]);
+      `INSERT INTO document_types (key, module, short, expires, required, required_for, urgent_days, due_days, monitor_days, officer_user_id, sort, multi)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT DO NOTHING`,
+      [t.key, t.module, t.short, t.expires, !!t.required, (t as any).requiredFor || [], t.urgent, t.due, t.monitor, withOfficers ? t.officer : null, i, !!(t as any).multi]);
   }
 }
 

@@ -8,7 +8,7 @@ import { storeFile, removeStored } from '../storage.js';
 import { docCfg, fmt, iso, ACTION_STATES } from '@adroit/core/src/core/shared.js';
 import { cfg } from '../config.js';
 
-export type DocFields = { name?: string; ref?: string; issuer?: string; issued?: string; expiry?: string };
+export type DocFields = { name?: string; ref?: string; issuer?: string; issued?: string; expiry?: string; docId?: string };
 export type Upload = { buffer: Buffer; filename: string } | null;
 const dateOk = (s?: string) => !s || /^\d{4}-\d{2}-\d{2}$/.test(s);
 const entity = (m: string) => (m === 'hr' ? 'Employee document' : 'Asset document');
@@ -29,12 +29,22 @@ export async function saveDocument(c: pg.PoolClient, user: any, actor: Actor, mo
   const today = iso(new Date());
   let written: string | undefined;
   try {
-    let doc = await one<any>('SELECT * FROM documents WHERE owner_module = $1 AND owner_id = $2 AND type = $3 FOR UPDATE', [module, owner.uid, type], c);
+    // Multi types (e.g. Qualification Certificate) hold many documents per owner: a docId picks one, no docId adds a new one.
+    const multi = !!(t as any).multi;
+    let doc = f.docId
+      ? await one<any>('SELECT * FROM documents WHERE id = $1 AND owner_module = $2 AND owner_id = $3 AND type = $4 FOR UPDATE', [f.docId, module, owner.uid, type], c)
+      : multi ? null : await one<any>('SELECT * FROM documents WHERE owner_module = $1 AND owner_id = $2 AND type = $3 FOR UPDATE', [module, owner.uid, type], c);
+    if (f.docId && !doc) throw bad('That document no longer exists. Refresh the page and try again.');
     const cur = doc ? await one<any>('SELECT v.*, f.original_name FROM document_versions v LEFT JOIN files f ON f.id = v.file_id WHERE v.document_id = $1 AND v.is_current', [doc.id], c) : null;
     const stored = file ? await storeFile(c, file.buffer, file.filename, { module, id: owner.uid }, user.id) : null;
     written = stored?.full;
-    const name = (type === 'Other Permit' ? f.name?.trim() : '') || doc?.name || type;
-    if (type === 'Other Permit' && !name.trim()) throw bad('Enter the permit name.');
+    const name = (multi || type === 'Other Permit' ? f.name?.trim() : '') || doc?.name || (type === 'Other Permit' ? '' : type);
+    if (!name.trim()) throw bad('Enter the document name.');
+    if (multi) {
+      const clash = await one<any>('SELECT id FROM documents WHERE owner_module = $1 AND owner_id = $2 AND type = $3 AND lower(name) = lower($4) AND id <> $5',
+        [module, owner.uid, type, name, doc?.id || '00000000-0000-0000-0000-000000000000'], c);
+      if (clash) throw bad(`"${name}" is already recorded for ${owner.no}. Give this ${type.toLowerCase()} a different name, e.g. "${type} – Diploma".`);
+    }
 
     if (mode === 'renew') {
       if (!doc || !cur) throw bad('There is no current document to renew. Record it first.');
@@ -75,11 +85,13 @@ export async function saveDocument(c: pg.PoolClient, user: any, actor: Actor, mo
   }
 }
 
-export async function updateAction(c: pg.PoolClient, user: any, actor: Actor, module: 'hr' | 'fleet', owner: { uid: string; no: string }, type: string, status: string, note: string) {
+export async function updateAction(c: pg.PoolClient, user: any, actor: Actor, module: 'hr' | 'fleet', owner: { uid: string; no: string }, type: string, status: string, note: string, docId?: string) {
   checkType(module, type);
   assert(can(user, 'trackAction', { type }), forbidden(`Your role can't update ${type} renewals.`));
   if (!ACTION_STATES.includes(status) || status === 'Open') throw bad(`Status must be one of: ${ACTION_STATES.filter((s: string) => s !== 'Open').join(', ')}.`);
-  const doc = await one<any>('SELECT id, name FROM documents WHERE owner_module = $1 AND owner_id = $2 AND type = $3', [module, owner.uid, type], c);
+  const doc = docId
+    ? await one<any>('SELECT id, name FROM documents WHERE id = $1 AND owner_module = $2 AND owner_id = $3 AND type = $4', [docId, module, owner.uid, type], c)
+    : await one<any>('SELECT id, name FROM documents WHERE owner_module = $1 AND owner_id = $2 AND type = $3 ORDER BY created_at LIMIT 1', [module, owner.uid, type], c);
   if (!doc) throw bad('Record the document first.');
   let act = await one<any>('SELECT * FROM expiry_actions WHERE document_id = $1 AND completed_at IS NULL FOR UPDATE', [doc.id], c);
   const before = act?.status || 'Open';

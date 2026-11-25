@@ -8,18 +8,24 @@ const CYCLE = { Passport: 3650, 'Employment Visa': 730, 'Emirates ID': 730, 'Lab
 
 // mode 'renew': the new document replaces the current one, the old one moves to history (§8.3 step 6, §9)
 // mode 'upload': add or update the current record and/or its scan
-export function UploadDocModal({ module, owner, docType, mode = 'upload', onClose }) {
+// docId picks one document when the type allows several per owner (docCfg(type).multi), e.g. Qualification Certificates
+export function UploadDocModal({ module, owner, docType, docId, mode = 'upload', onClose }) {
   const { state, act, notify } = useStore();
   const [busy, setBusy] = useState(false);
   const types = docTypes(module).map((t) => t.key).filter((t) => can(state.user, 'uploadDoc', { type: t }));
   const [type, setType] = useState(docType || types.find((t) => !owner.docs.some((d) => d.type === t)) || types[types.length - 1]);
-  const existing = owner.docs.find((d) => d.type === type);
+  const [selId, setSelId] = useState(docId || null);
+  const findDoc = (t, id) => (id ? owner.docs.find((d) => d.docId === id) : docCfg(t).multi ? null : owner.docs.find((d) => d.type === t));
+  // a new document of a multi type needs its own name; the first one may just use the type name
+  const newName = (t) => (t === 'Other Permit' ? '' : docCfg(t).multi && owner.docs.some((d) => d.type === t) ? '' : t);
+  const existing = findDoc(type, selId);
+  const multi = !!docCfg(type).multi;
   const cfg = docCfg(type);
   const renew = mode === 'renew' && existing;
   const cycle = CYCLE[type] || 365;
   const base = existing?.expiry && existing.expiry > iso(TODAY) ? new Date(existing.expiry + 'T00:00:00') : TODAY;
   const suggested = iso(new Date(base.getTime() + cycle * 864e5));
-  const [name, setName] = useState(existing?.name || (type === 'Other Permit' ? '' : type));
+  const [name, setName] = useState(existing?.name || newName(type));
   const [ref, setRef] = useState(renew ? '' : existing?.ref || '');
   const [issuer, setIssuer] = useState(existing?.issuer || '');
   const [issued, setIssued] = useState(renew ? iso(TODAY) : existing?.issued || '');
@@ -27,7 +33,23 @@ export function UploadDocModal({ module, owner, docType, mode = 'upload', onClos
   const [file, setFile] = useState(null);
   const [err, setErr] = useState('');
   const isPhotoPage = type.includes('Passport Page') || type === 'Emirates ID Back';
-  const switchType = (t) => { setType(t); const ex = owner.docs.find((d) => d.type === t); setName(ex?.name || (t === 'Other Permit' ? '' : t)); setRef(ex?.ref || ''); setIssuer(ex?.issuer || ''); setIssued(ex?.issued || ''); setExpiry(ex?.expiry || ''); };
+  const switchType = (t) => { setType(t); setSelId(null); const ex = findDoc(t, null); setName(ex?.name || newName(t)); setRef(ex?.ref || ''); setIssuer(ex?.issuer || ''); setIssued(ex?.issued || ''); setExpiry(ex?.expiry || ''); };
+
+  const canAddType = module === 'hr' && can(state.user, 'editEmployee');
+  const [adding, setAdding] = useState(false);
+  const [newType, setNewType] = useState('');
+  const [newExpires, setNewExpires] = useState(false);
+  const addType = async () => {
+    const n = newType.trim();
+    if (n.length < 2) { setErr('Enter the new document name.'); return; }
+    setBusy(true); setErr('');
+    try {
+      await act.addDocType(n, newExpires);
+      switchType(n); setAdding(false); setNewType(''); setNewExpires(false);
+      notify(`Document type "${n}" added`);
+    } catch (x) { setErr(x.message); }
+    setBusy(false);
+  };
 
   const save = async (e) => {
     e.preventDefault();
@@ -37,7 +59,9 @@ export function UploadDocModal({ module, owner, docType, mode = 'upload', onClos
     if (!renew && !existing && !isPhotoPage && (!ref || (cfg.expires && !expiry))) { setErr(`Enter the reference number${cfg.expires ? ' and expiry date' : ''} for the new document.`); return; }
     if (!renew && existing && !file && ref === existing.ref && expiry === existing.expiry && issuer === existing.issuer) { setErr('Choose a scanned file, or change the document details.'); return; }
     if (type === 'Other Permit' && !name.trim()) { setErr('Enter the permit name, e.g. RTA Heavy Vehicle Permit.'); return; }
-    const fields = { name: name || type, ref: isPhotoPage ? '-' : ref, issuer, issued, expiry: cfg.expires ? expiry : '' };
+    if (multi && !name.trim()) { setErr(`Enter a name for this ${type.toLowerCase()}, e.g. ${type} – Diploma in Mechanical Engineering.`); return; }
+    if (multi && owner.docs.some((d) => d.type === type && d.docId !== existing?.docId && d.name.trim().toLowerCase() === name.trim().toLowerCase())) { setErr(`"${name.trim()}" is already recorded. Use a different name.`); return; }
+    const fields = { name: name.trim() || type, ref: isPhotoPage ? '-' : ref, issuer, issued, expiry: cfg.expires ? expiry : '', docId: existing?.docId };
     setBusy(true); setErr('');
     try {
       await act.saveDoc(module, owner.id, type, renew ? 'renew' : 'upload', fields, file);
@@ -53,13 +77,27 @@ export function UploadDocModal({ module, owner, docType, mode = 'upload', onClos
       <form id="doc-form" className="form-grid" onSubmit={save}>
         {!docType && (
           <Field label="Document type" span={2}>
-            <select id="doc-type" value={type} onChange={(e) => switchType(e.target.value)}>
-              {types.map((t) => <option key={t} value={t}>{t}{owner.docs.some((d) => d.type === t) ? ' (update existing)' : ''}</option>)}
-            </select>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <select id="doc-type" style={{ flex: 1 }} value={type} onChange={(e) => switchType(e.target.value)}>
+                {types.map((t) => { const n = owner.docs.filter((d) => d.type === t).length; return <option key={t} value={t}>{t}{n ? (docCfg(t).multi ? ` (${n} recorded · add another)` : ' (update existing)') : ''}</option>; })}
+              </select>
+              {canAddType && <button type="button" className="btn" id="doc-type-add" title="Add a new document name" onClick={() => { setAdding((a) => !a); setErr(''); }}>{adding ? '×' : '+'}</button>}
+            </div>
           </Field>
+        )}
+        {!docType && adding && (
+          <div className="span-2" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <input id="doc-type-new" style={{ flex: 1, minWidth: '180px' }} value={newType} onChange={(e) => setNewType(e.target.value)} placeholder="New document name, e.g. Driving Licence"
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addType(); } }} autoFocus />
+            <label style={{ display: 'flex', gap: '6px', alignItems: 'center', whiteSpace: 'nowrap' }}>
+              <input type="checkbox" checked={newExpires} onChange={(e) => setNewExpires(e.target.checked)} /> Has expiry date
+            </label>
+            <button type="button" className="btn btn-primary" onClick={addType} disabled={busy}>Add</button>
+          </div>
         )}
         {renew && <p className="note span-2">Current: <strong className="mono">{existing.ref}</strong>, expires <strong>{fmt(existing.expiry)}</strong>. It stays in the document history, and the open renewal action is marked Completed.</p>}
         {type === 'Other Permit' && <Field label="Permit name" span={2}><input id="doc-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. RTA Heavy Vehicle Permit" /></Field>}
+        {multi && type !== 'Other Permit' && !renew && <Field label="Document name" span={2} hint={`You can record any number of ${type.toLowerCase()}s; the name tells them apart.`}><input id="doc-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={`e.g. ${type} – Diploma in Mechanical Engineering`} /></Field>}
         {!isPhotoPage && (
           <>
             <Field label={renew ? 'New document / policy no.' : 'Document / policy no.'}><input id="doc-ref" value={ref} onChange={(e) => setRef(e.target.value)} placeholder={existing?.ref || ''} /></Field>
@@ -90,7 +128,7 @@ export function RenewalActionModal({ module, owner, doc, onClose }) {
   return (
     <Modal title={`Renewal action · ${doc.name || doc.type}`} onClose={onClose}
       footer={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn btn-primary" form="rn-form" type="submit" disabled={busy}>Update action</button></>}>
-      <form id="rn-form" className="form-grid" onSubmit={async (e) => { e.preventDefault(); setBusy(true); if (await run(() => act.updateAction(module, owner.id, doc.type, status, note), `${owner.id} · ${doc.name || doc.type}: ${status}`)) onClose(); else setBusy(false); }}>
+      <form id="rn-form" className="form-grid" onSubmit={async (e) => { e.preventDefault(); setBusy(true); if (await run(() => act.updateAction(module, owner.id, doc.type, status, note, doc.docId), `${owner.id} · ${doc.name || doc.type}: ${status}`)) onClose(); else setBusy(false); }}>
         <p className="note span-2">{owner.id} · {owner.name || `${owner.make} ${owner.model}`} · expires {fmt(doc.expiry)}<br />Current action: <strong>{doc.renewal ? `${doc.renewal.status} (${doc.renewal.by}, ${fmt(doc.renewal.date)})` : 'Open'}</strong></p>
         <Field label="Action status" span={2}>
           <div className="seg">{opts.map((s) => <button type="button" key={s} className={status === s ? 'on' : ''} onClick={() => setStatus(s)}>{s}</button>)}</div>

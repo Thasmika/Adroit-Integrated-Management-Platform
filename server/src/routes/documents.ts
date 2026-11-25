@@ -33,7 +33,7 @@ export default async function docRoutes(app: FastifyInstance) {
       }
     } else Object.assign(fields, req.body || {});
     const f = z.object({ mode: z.enum(['upload', 'renew']).default('upload'), name: z.string().max(120).optional(), ref: z.string().max(80).optional(),
-      issuer: z.string().max(120).optional(), issued: z.string().max(10).optional(), expiry: z.string().max(10).optional() }).parse(fields);
+      issuer: z.string().max(120).optional(), issued: z.string().max(10).optional(), expiry: z.string().max(10).optional(), docId: z.string().uuid().optional() }).parse(fields);
     await tx((c) => saveDocument(c, req.user, req.actor, module, o, type, f.mode, f, file));
     return out(req.user, module, o.uid);
   });
@@ -42,9 +42,9 @@ export default async function docRoutes(app: FastifyInstance) {
     const p = req.params as any;
     const module = p.module as 'hr' | 'fleet';
     requireModule(req.user, module);
-    const b = z.object({ status: z.string(), note: z.string().max(500).optional().default('') }).parse(req.body);
+    const b = z.object({ status: z.string(), note: z.string().max(500).optional().default(''), docId: z.string().uuid().optional() }).parse(req.body);
     const o = await owner(req.user, module, decodeURIComponent(p.owner));
-    await tx((c) => updateAction(c, req.user, req.actor, module, o, decodeURIComponent(p.type), b.status, b.note));
+    await tx((c) => updateAction(c, req.user, req.actor, module, o, decodeURIComponent(p.type), b.status, b.note, b.docId));
     return out(req.user, module, o.uid);
   });
 
@@ -54,7 +54,10 @@ export default async function docRoutes(app: FastifyInstance) {
     const type = decodeURIComponent(p.type);
     if (!canSeeDoc(req.user, type)) throw notFound();
     const o = await owner(req.user, p.module, decodeURIComponent(p.owner));
-    const d = await one<any>('SELECT id FROM documents WHERE owner_module = $1 AND owner_id = $2 AND type = $3', [p.module, o.uid, type]);
+    const docId = (req.query as any)?.docId;
+    const d = docId && /^[0-9a-f-]{36}$/i.test(docId)
+      ? await one<any>('SELECT id FROM documents WHERE id = $1 AND owner_module = $2 AND owner_id = $3 AND type = $4', [docId, p.module, o.uid, type])
+      : await one<any>('SELECT id FROM documents WHERE owner_module = $1 AND owner_id = $2 AND type = $3 ORDER BY created_at LIMIT 1', [p.module, o.uid, type]);
     return { items: d ? await actionHistory(d.id) : [] };
   });
 }

@@ -143,8 +143,8 @@ export default function LeavePrintModal({ leave, emp, close }) {
           </div>
 
           {/* Employee Signature */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '22px', marginBottom: '14px' }}>
-            <div style={{ textAlign: 'center', width: '240px' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '64px', marginBottom: '14px' }}>
+            <div style={{ textAlign: 'center', width: '260px' }}>
               <div style={{ borderTop: '1px solid #000', paddingTop: '4px' }}>
                 <strong>Signature of Employee</strong>
                 <div style={{ fontSize: '11px', color: '#555' }}>Date: {fmt(leave.requestedOn || new Date())}</div>
@@ -176,8 +176,8 @@ export default function LeavePrintModal({ leave, emp, close }) {
             <span style={{ width: '100px', borderBottom: '1px solid #000', textAlign: 'center', fontWeight: 'bold' }}>{fmt(leave.end)}</span>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '28px', gap: '20px' }}>
-            <div style={{ textAlign: 'center', width: '220px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '72px', gap: '20px' }}>
+            <div style={{ textAlign: 'center', width: '250px' }}>
               <div style={{ borderTop: '1px solid #000', paddingTop: '4px' }}>
                 <strong>Divisional / Dept Incharge</strong>
                 <div style={{ fontSize: '11px', color: '#555' }}>Signature &amp; Date</div>

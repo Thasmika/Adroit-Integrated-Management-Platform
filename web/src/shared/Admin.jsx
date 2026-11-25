@@ -31,7 +31,7 @@ export default function Admin({ initialTab }) {
     return run(() => (exists ? act.listUpdate(l, key, { active: item.active }) : act.listAdd(l, { name: item.name, short: item.short, kind: item.kind, active: true })), msg);
   };
   const sys = (patch, msg) => run(() => act.system(patch), msg || 'Configuration saved');
-  const officers = cfg.users.filter((x) => x.active && ['hr', 'pro', 'insurance', 'fleet'].includes(x.role));
+  const officers = cfg.users.filter((x) => x.active && ['hr', 'pro', 'insurance', 'fleet', 'sysadmin'].includes(x.role));
 
   return (
     <div className="page">

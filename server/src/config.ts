@@ -19,16 +19,17 @@ export const SYSTEM_DEFAULTS = {
 export type Cfg = {
   companies: any[]; departments: any[]; locations: any[]; categories: any[];
   users: any[]; docTypes: any[]; templates: any[]; system: typeof SYSTEM_DEFAULTS;
+  lookups: Record<string, string[]>;
 };
 let CFG: Cfg;
 
 export const docTypeRow = (t: any) => ({
   key: t.key, module: t.module, short: t.short, expires: t.expires, required: t.required, requiredFor: t.required_for || [],
-  urgent: t.urgent_days, due: t.due_days, monitor: t.monitor_days, officer: t.officer_user_id, sort: t.sort,
+  urgent: t.urgent_days, due: t.due_days, monitor: t.monitor_days, officer: t.officer_user_id, sort: t.sort, multi: !!t.multi,
 });
 
 export async function loadConfig(db: Db = pool): Promise<Cfg> {
-  const [companies, departments, locations, categories, users, docTypes, templates, sys] = await Promise.all([
+  const [companies, departments, locations, categories, users, docTypes, templates, sys, lookupRows] = await Promise.all([
     q('SELECT id, name, short, kind, active, mol_code AS "molCode" FROM companies ORDER BY kind DESC, name', [], db),
     q('SELECT id, name, active FROM departments ORDER BY id', [], db),
     q('SELECT id, name, active FROM locations ORDER BY id', [], db),
@@ -37,10 +38,13 @@ export async function loadConfig(db: Db = pool): Promise<Cfg> {
     q('SELECT * FROM document_types ORDER BY sort, key', [], db),
     q('SELECT * FROM notification_templates ORDER BY id', [], db),
     q('SELECT key, value FROM system_config', [], db),
+    q('SELECT list, value FROM lookup_values ORDER BY created_at, value', [], db),
   ]);
+  const lookups: Record<string, string[]> = {};
+  lookupRows.forEach((r: any) => { (lookups[r.list] ||= []).push(r.value); });
   const system = { ...SYSTEM_DEFAULTS };
   sys.forEach((r: any) => { (system as any)[r.key] = r.value; });
-  CFG = { companies, departments, locations, categories, users, docTypes: docTypes.map(docTypeRow), templates, system };
+  CFG = { companies, departments, locations, categories, users, docTypes: docTypes.map(docTypeRow), templates, system, lookups };
   setConfig(CFG as any);
   return CFG;
 }
@@ -52,7 +56,7 @@ export function publicConfig(user: any) {
   const admin = user?.role === 'sysadmin';
   return {
     companies: c.companies, departments: c.departments, locations: c.locations, categories: c.categories,
-    docTypes: c.docTypes,
+    docTypes: c.docTypes, lookups: c.lookups,
     users: admin ? c.users : c.users.filter((u) => u.active).map((u) => ({ id: u.id, name: u.name, role: u.role, scope: u.scope, active: u.active })),
     templates: admin ? c.templates : [],
     system: c.system,

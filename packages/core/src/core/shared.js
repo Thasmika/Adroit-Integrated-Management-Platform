@@ -41,6 +41,7 @@ export const COMPANIES_INIT = [
   { id: 'C07', name: 'Adroit Contracting', short: 'Adroit Contracting', kind: 'Operating company', active: true, molCode: '324688' },
   { id: 'C08', name: 'Al Mahara Machinery & Equipment Rental', short: 'Al Mahara', kind: 'Operating company', active: true, molCode: '278408' },
   { id: 'C09', name: 'Najam Al Barri Building Equipment Rental', short: 'Najam Al Barri', kind: 'Operating company', active: true, molCode: '219281' },
+  { id: 'C10', name: 'Other', short: 'Other', kind: 'Operating company', active: true, molCode: '0' },
 ];
 export const OPERATING = COMPANIES_INIT[0].name;
 export const DEPARTMENTS_INIT = [
@@ -91,12 +92,12 @@ export const DOC_TYPES_INIT = [
   { key: 'Emirates ID Back', module: 'hr', short: 'EID2', expires: false, required: false, urgent: 0, due: 0, monitor: 0, officer: 'u-pro' },
   { key: 'Labour Card', module: 'hr', short: 'LC', expires: true, required: false, urgent: 30, due: 60, monitor: 90, officer: 'u-pro' },
   { key: 'Health Insurance', module: 'hr', short: 'INS', expires: true, required: true, urgent: 30, due: 60, monitor: 90, officer: 'u-ins' },
-  { key: 'Qualification Certificate', module: 'hr', short: 'QUAL', expires: false, required: false, urgent: 0, due: 0, monitor: 0, officer: 'u-hr' },
+  { key: 'Qualification Certificate', module: 'hr', short: 'QUAL', multi: true, expires: false, required: false, urgent: 0, due: 0, monitor: 0, officer: 'u-hr' },
   { key: 'Vehicle Registration', module: 'fleet', short: 'REG', expires: true, requiredFor: ['Heavy Vehicle', 'Light Vehicle', 'Trailer', 'Other Company Vehicle'], urgent: 30, due: 60, monitor: 90, officer: 'u-trn' },
   { key: 'Motor Insurance', module: 'fleet', short: 'INS', expires: true, requiredFor: [...DEFAULT_CATEGORIES], urgent: 30, due: 60, monitor: 90, officer: 'u-ins' },
   { key: 'Safety Certificate', module: 'fleet', short: 'SAFE', expires: true, requiredFor: ['Heavy Vehicle', 'Heavy Machine / Equipment'], urgent: 30, due: 60, monitor: 90, officer: 'u-hse' },
   { key: 'Inspection / Test Certificate', module: 'fleet', short: 'INSP', expires: true, requiredFor: ['Trailer', 'Heavy Machine / Equipment'], urgent: 30, due: 60, monitor: 90, officer: 'u-hse' },
-  { key: 'Other Permit', module: 'fleet', short: 'PMT', expires: true, requiredFor: [], urgent: 30, due: 60, monitor: 90, officer: 'u-trn' },
+  { key: 'Other Permit', module: 'fleet', short: 'PMT', multi: true, expires: true, requiredFor: [], urgent: 30, due: 60, monitor: 90, officer: 'u-trn' },
 ];
 
 // Live configuration used by the engine. The store keeps its own copy and calls setConfig() when admins change it.
@@ -110,7 +111,8 @@ export const getConfig = () => CFG;
 export const docCfg = (type) => CFG.docTypes.find((t) => t.key === type) || { key: type, module: '', expires: true, urgent: 30, due: 60, monitor: 90, officer: null };
 export const docTypes = (module) => CFG.docTypes.filter((t) => !module || t.module === module);
 export const userById = (id) => CFG.users.find((u) => u.id === id);
-export const officerFor = (type) => { const u = userById(docCfg(type).officer) || CFG.users[0]; return { ...u, roleLabel: ROLES[u.role]?.label }; };
+// No officer set for the type (Administration → Document types) → "Not assigned"; never fall back to an arbitrary user
+export const officerFor = (type) => { const u = userById(docCfg(type).officer); return u ? { ...u, roleLabel: ROLES[u.role]?.label } : { id: null, name: 'Not assigned', role: null, roleLabel: '' }; };
 export const requiredFor = (module, category) => docTypes(module).filter((t) => (module === 'hr' ? t.required : (t.requiredFor || []).includes(category))).map((t) => t.key);
 
 // ---------- the single expiry engine (§6.3, §10) ----------

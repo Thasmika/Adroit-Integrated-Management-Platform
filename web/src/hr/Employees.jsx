@@ -2,11 +2,19 @@ import React, { useMemo, useState } from 'react';
 import { useStore, go, href } from '../core/store.jsx';
 import { docStatus, docTypes, fmt, OPERATING, ROLES } from '../core/shared.js';
 import { scopeEmployees, canSeeDoc, can } from '../core/access.js';
-import { Icon, Avatar, Modal } from '../core/ui.jsx';
+import { Icon, Avatar, Modal, LeavePill } from '../core/ui.jsx';
 import { empParam, HR_STATUSES, SPONSORS } from './data.js';
 import EmployeePrintModal from './EmployeePrintModal.jsx';
 
 const PAGE = 20;
+// Vacation filter: where each employee stands with leave right now
+const LEAVE_FILTERS = [
+  ['away', 'On vacation (all away)'],
+  ['On Leave', 'On leave now'],
+  ['Awaiting Rejoining', 'Leave ended · awaiting rejoining'],
+  ['Approved', 'Leave approved · not yet departed'],
+  ['working', 'At work (not on leave)'],
+];
 
 export default function Employees() {
   const { state, act, notify } = useStore();
@@ -17,7 +25,7 @@ export default function Employees() {
 
   // Filters (Changes Report 01, items 4–5; HR Updates Part 3):
   // Branch/location and employee code dropdown removed
-  const EMPTY = { q: '', dept: '', sponsor: '', nat: '', status: '' };
+  const EMPTY = { q: '', dept: '', sponsor: '', nat: '', status: '', leave: '' };
   const [f, setF] = useState(EMPTY);
   const [page, setPage] = useState(0);
   const [showPrint, setShowPrint] = useState(false);
@@ -29,9 +37,22 @@ export default function Employees() {
   const companies = state.config.companies;
   const shortName = (name) => companies.find((c) => c.name === name)?.short || name;
 
+  // the employee's current leave: On Leave / Awaiting Rejoining first, then an approved upcoming one
+  const leaveOf = useMemo(() => {
+    const m = new Map();
+    const rank = { 'On Leave': 1, 'Awaiting Rejoining': 2, Approved: 3 };
+    state.leaves.forEach((l) => { if (rank[l.status] && (!m.has(l.empId) || rank[l.status] < rank[m.get(l.empId).status])) m.set(l.empId, l); });
+    return m;
+  }, [state.leaves]);
+
   const rows = useMemo(() => {
     const t = f.q.trim().toLowerCase();
     return all.filter((e) => {
+      if (f.leave) {
+        const st = leaveOf.get(e.id)?.status;
+        const away = st === 'On Leave' || st === 'Awaiting Rejoining';
+        if (f.leave === 'away' ? !away : f.leave === 'working' ? away : st !== f.leave) return false;
+      }
       if (f.dept && e.department !== f.dept) return false;
       if (f.sponsor && e.sponsor !== f.sponsor) return false;
       if (f.nat && e.nationality !== f.nat) return false;
@@ -39,7 +60,7 @@ export default function Employees() {
       if (!t) return true;
       return [e.name, e.id, e.code, e.molId, e.designation, e.department, e.nationality, e.mobile, ...e.docs.filter((d) => canSeeDoc(u, d.type)).map((d) => d.ref)].join(' ').toLowerCase().includes(t);
     });
-  }, [all, f, u]);
+  }, [all, f, u, leaveOf]);
   const pages = Math.max(1, Math.ceil(rows.length / PAGE));
   const view = rows.slice(page * PAGE, (page + 1) * PAGE);
   const any = Object.values(f).some(Boolean);
@@ -85,6 +106,7 @@ export default function Employees() {
         <select id="f-sponsor" value={f.sponsor} onChange={set('sponsor')} aria-label="Sponsor"><option value="">All sponsors</option>{((state.config.companies?.length ? state.config.companies.map((c) => c.name) : SPONSORS)).map((s) => <option key={s} value={s}>{s}</option>)}</select>
         <select id="f-nat" value={f.nat} onChange={set('nat')} aria-label="Nationality"><option value="">All nationalities</option>{nats.map((d) => <option key={d}>{d}</option>)}</select>
         <select id="f-status" value={f.status} onChange={set('status')} aria-label="Employment status"><option value="">Any status</option>{HR_STATUSES.map((s) => <option key={s}>{s}</option>)}</select>
+        <select id="f-leave" value={f.leave} onChange={set('leave')} aria-label="Vacation / leave"><option value="">Any leave / vacation</option>{LEAVE_FILTERS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
         {any && <button className="btn btn-ghost" onClick={() => { setF(EMPTY); setPage(0); }}>Clear</button>}
       </div>
 
@@ -106,7 +128,7 @@ export default function Employees() {
             <tbody>
               {view.map((e) => (
                 <tr key={e.id} className="clickable" onClick={() => go('hr-employee', empParam(e.id))}>
-                  <td><div className="who-row"><Avatar name={e.name} size={34} photo={e.photo} /><div className="who"><a href={href('hr-employee', empParam(e.id))} onClick={(ev) => ev.stopPropagation()}><strong>{e.name}</strong></a>{e.status !== 'Active' && <small className="mono"> · {e.status}</small>}</div></div></td>
+                  <td><div className="who-row"><Avatar name={e.name} size={34} photo={e.photo} /><div className="who"><a href={href('hr-employee', empParam(e.id))} onClick={(ev) => ev.stopPropagation()}><strong>{e.name}</strong></a>{e.status !== 'Active' && <small className="mono"> · {e.status}</small>}{leaveOf.get(e.id) && <span style={{ display: 'block', marginTop: '2px' }}><LeavePill status={leaveOf.get(e.id).status} />{leaveOf.get(e.id).status !== 'Approved' ? <small className="muted"> until {fmt(leaveOf.get(e.id).end)}</small> : <small className="muted"> from {fmt(leaveOf.get(e.id).start)}</small>}</span>}</div></div></td>
                   <td className="mono small">{e.id.replace(/^EMP\s*/i, '')}</td>
                   <td className="mono small">{e.code || <span className="muted">—</span>}</td>
                   <td>{e.department.replace(' Department', '')}</td>

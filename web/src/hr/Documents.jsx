@@ -5,6 +5,9 @@ import { scopeEmployees, canSeeDoc, can } from '../core/access.js';
 import { Icon, Tabs, StatusPill, DocViewer, Avatar, Empty, ActionPill } from '../core/ui.jsx';
 import { UploadDocModal, RenewalActionModal } from '../core/docModals.jsx';
 import { hrExpiryRows, hrMissing, empParam, maskNo, SPONSORS } from './data.js';
+import { reportExporter, WIN_LABEL } from '../core/export.js';
+import { ExportButtons, statusText } from '../core/ExportButtons.jsx';
+
 
 const TABS = ['expiry', 'alerts', 'library', 'missing'];
 
@@ -35,8 +38,39 @@ export default function HrDocuments({ initialTab }) {
     emps.forEach((e) => { if (t && !`${e.name} ${e.id} ${e.docs.map((d) => d.ref).join(' ')}`.toLowerCase().includes(t)) return; e.docs.forEach((d) => { if (d.file && canSeeDoc(u, d.type)) out.push({ emp: e, doc: d }); }); });
     return out;
   }, [emps, q, u]);
-  const fresh = (e, type) => { const x = state.employees.find((y) => y.id === e.id); return { emp: x, doc: x.docs.find((d) => d.type === type) }; };
+  const fresh = (e, doc) => { const x = state.employees.find((y) => y.id === e.id); return { emp: x, doc: x.docs.find((d) => (doc.docId ? d.docId === doc.docId : d.type === doc.type)) }; };
   const officers = state.config.users.filter((x) => docTypes('hr').some((t) => t.officer === x.id));
+
+  const EXPORT_HEADERS = ['Employee', 'Emp No', 'Department', 'Location', 'Visa Sponsor', 'Document', 'Document No', 'Expiry', 'Status', 'Action Status', 'Responsible'];
+  const exportRows = (list) => list.map((r) => [
+    r.emp.name, r.emp.id, (r.emp.department || '').replace(' Department', ''), r.emp.location || '', r.emp.sponsor || r.emp.company || '',
+    r.doc.type, maskNo(r.doc.ref, r.doc.type) + (r.doc.type === 'Employment Visa' && r.emp.sponsor !== r.emp.company ? ' (group visa)' : ''),
+    fmt(r.doc.expiry), statusText(r.doc), actionStatus(r.doc), officerFor(r.doc.type).name,
+  ]);
+  const exportSubtitle = () => {
+    const parts = [WIN_LABEL[win] || `Within ${win} days`, 'Documents: ' + (types.length === visTypes.length ? 'All' : types.join(', ') || 'None')];
+    if (f.officer) parts.push('Officer: ' + (officers.find((o) => o.id === f.officer)?.name || f.officer));
+    if (f.action) parts.push('Action: ' + f.action);
+    if (f.dept) parts.push('Department: ' + f.dept);
+    if (f.loc) parts.push('Location: ' + f.loc);
+    if (f.company) parts.push('Sponsor: ' + f.company);
+    parts.push('As of ' + fmt(new Date()));
+    return parts.join(' · ');
+  };
+  const expiryExp = reportExporter({
+    name: `HR-Document-Expiry-${win === 0 ? 'Expired' : win + 'days'}`, title: 'HR Document Expiry Report', subtitle: exportSubtitle(),
+    sheet: 'Expiry', headers: EXPORT_HEADERS, rows: exportRows(rows), statusCol: 8, by: u.name,
+  });
+  const mineExp = reportExporter({
+    name: 'HR-Documents-Assigned-to-me', title: `HR Documents Assigned to ${u.name} · Next 60 Days`, subtitle: 'As of ' + fmt(new Date()),
+    sheet: 'Assigned', headers: EXPORT_HEADERS, rows: exportRows(mine), statusCol: 8, by: u.name,
+  });
+  const missingExp = reportExporter({
+    name: 'HR-Missing-Documents', title: 'HR Missing Documents Report', subtitle: 'As of ' + fmt(new Date()), sheet: 'Missing',
+    headers: ['Employee', 'Emp No', 'Department', 'Location', 'Document', 'Problem'],
+    rows: missing.map((m) => [m.emp.name, m.emp.id, (m.emp.department || '').replace(' Department', ''), m.emp.location || '', m.type, m.recorded ? 'Recorded, no scanned copy' : 'Required, not recorded']),
+    statusCol: 5, by: u.name,
+  });
 
   const ExpiryTable = ({ list }) => (
     <div className="table-wrap">
@@ -46,16 +80,16 @@ export default function HrDocuments({ initialTab }) {
           {list.map((r, i) => {
             const ok = can(u, 'uploadDoc', { type: r.doc.type });
             return (
-              <tr key={r.emp.id + r.doc.type + i}>
+              <tr key={r.doc.docId || r.emp.id + r.doc.type + i}>
                 <td><a className="who" href={href('hr-employee', empParam(r.emp.id))}><strong>{r.emp.name}</strong><small className="mono">{r.emp.id} · {r.emp.department.replace(' Department', '')}</small></a></td>
-                <td>{r.doc.type}<small className="block muted mono">{maskNo(r.doc.ref, r.doc.type)}{r.doc.type === 'Employment Visa' && r.emp.sponsor !== r.emp.company ? ' · group visa' : ''}</small></td>
+                <td>{r.doc.type}{r.doc.name && r.doc.name !== r.doc.type ? ` · ${r.doc.name}` : ''}<small className="block muted mono">{maskNo(r.doc.ref, r.doc.type)}{r.doc.type === 'Employment Visa' && r.emp.sponsor !== r.emp.company ? ' · group visa' : ''}</small></td>
                 <td className="mono nowrap">{fmt(r.doc.expiry)}</td>
                 <td><StatusPill doc={r.doc} /></td>
                 <td className="small"><ActionPill status={actionStatus(r.doc)} /><span className="block muted">{officerFor(r.doc.type).name}</span></td>
                 <td className="right nowrap actions">
-                  {r.doc.file && <button className="btn btn-sm btn-ghost" onClick={() => setViewing(fresh(r.emp, r.doc.type))} aria-label="View scan"><Icon n="eye" size={14} /></button>}
-                  {ok && <button className="btn btn-sm" onClick={() => setTracking(fresh(r.emp, r.doc.type))}>Action</button>}
-                  {ok && <button className="btn btn-sm btn-primary" onClick={() => setUpload({ emp: r.emp, type: r.doc.type, mode: 'renew' })}>Renew</button>}
+                  {r.doc.file && <button className="btn btn-sm btn-ghost" onClick={() => setViewing(fresh(r.emp, r.doc))} aria-label="View scan"><Icon n="eye" size={14} /></button>}
+                  {ok && <button className="btn btn-sm" onClick={() => setTracking(fresh(r.emp, r.doc))}>Action</button>}
+                  {ok && <button className="btn btn-sm btn-primary" onClick={() => setUpload({ emp: r.emp, type: r.doc.type, docId: r.doc.docId, mode: 'renew' })}>Renew</button>}
                 </td>
               </tr>
             );
@@ -103,7 +137,10 @@ export default function HrDocuments({ initialTab }) {
             <select id="hd-co" value={f.company} onChange={set('company')} aria-label="Visa sponsor"><option value="">Any sponsor company</option>{((state.config.companies?.length ? state.config.companies.map((c) => c.name) : SPONSORS)).map((s) => <option key={s} value={s}>{s}</option>)}</select>
           </div>
           <ExpiryTable list={rows} />
-          <div className="pager"><span className="muted small">{rows.length} documents {win === 0 ? 'already expired' : `expired or expiring within ${win} days`}</span></div>
+          <div className="pager">
+            <span className="muted small">{rows.length} documents {win === 0 ? 'already expired' : `expired or expiring within ${win} days`}</span>
+            <ExportButtons exp={expiryExp} disabled={rows.length === 0} />
+          </div>
         </section>
       )}
 
@@ -120,6 +157,7 @@ export default function HrDocuments({ initialTab }) {
           <section className="panel flush">
             <div className="panel-head pad"><h2>{mine.length ? 'Assigned to you · next 60 days' : 'Nothing is assigned to you'}</h2><span className="muted small">Alert timing and routing are set in Administration.</span></div>
             {mine.length > 0 && <ExpiryTable list={mine} />}
+            {mine.length > 0 && <div className="pager"><span className="muted small">{mine.length} documents assigned to you</span><ExportButtons exp={mineExp} /></div>}
           </section>
         </div>
       )}
@@ -163,12 +201,13 @@ export default function HrDocuments({ initialTab }) {
               ))}</tbody>
             </table></div>
           )}
+          {missing.length > 0 && <div className="pager"><span className="muted small">{missing.length} missing documents</span><ExportButtons exp={missingExp} /></div>}
         </section>
       )}
 
       {viewing && <DocViewer owner={viewing.emp} module="hr" doc={viewing.doc} onClose={() => setViewing(null)} />}
       {tracking && <RenewalActionModal module="hr" owner={tracking.emp} doc={tracking.doc} onClose={() => setTracking(null)} />}
-      {upload && <UploadDocModal module="hr" owner={state.employees.find((e) => e.id === upload.emp.id)} docType={upload.type} mode={upload.mode} onClose={() => setUpload(null)} />}
+      {upload && <UploadDocModal module="hr" owner={state.employees.find((e) => e.id === upload.emp.id)} docType={upload.type} docId={upload.docId} mode={upload.mode} onClose={() => setUpload(null)} />}
     </div>
   );
 }

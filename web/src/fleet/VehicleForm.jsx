@@ -4,12 +4,16 @@ import { requiredFor, docTypes, officerFor, OPERATING } from '../core/shared.js'
 import { can } from '../core/access.js';
 import { CATEGORIES, STATUSES, USAGE, assetIdFromParam, assetParam } from './data.js';
 import { Field, Icon, VehicleArt, Empty, DateInput } from '../core/ui.jsx';
+import { AddableSelect, withLookup } from '../core/AddableSelect.jsx';
+
+const EMIRATES = ['Dubai', 'Sharjah', 'Ajman', 'Abu Dhabi', 'Ras Al Khaimah', 'Fujairah', 'Umm Al Quwain'];
 
 export default function VehicleForm({ param }) {
   const { state, act, notify } = useStore();
   const [busy, setBusy] = useState(false);
+  const [newCat, setNewCat] = useState(null);
   const cfg = state.config || {};
-  const fleetOfficers = (cfg?.users || []).filter((x) => x.active && ['fleet', 'insurance'].includes(x.role));
+  const fleetOfficers = (cfg?.users || []).filter((x) => x.active && ['fleet', 'insurance', 'sysadmin'].includes(x.role));
   const editing = param ? state.assets.find((a) => a.id === assetIdFromParam(param)) : null;
   const nextNo = 'New asset';
   const activeCompanies = (cfg?.companies || []).filter((c) => c.active);
@@ -19,7 +23,7 @@ export default function VehicleForm({ param }) {
   const [f, setF] = useState(() => editing ? { ...editing } : {
     id: nextNo, category: CATEGORIES[0], make: '', model: '', body: '', year: new Date().getFullYear(), colour: 'White', emirate: 'Dubai', plate: '',
     vin: '', engine: '', company: defaultCompany, department: defaultDept, location: defaultLoc, status: 'Active',
-    usage: 'Delivery', officer: officerFor('Vehicle Registration')?.name || fleetOfficers[0]?.name || 'Fleet Officer', photo: null, capacity: '', acquired: '', odometer: '', remarks: '', docs: [],
+    usage: 'Delivery', officer: (officerFor('Vehicle Registration').id && officerFor('Vehicle Registration').name) || fleetOfficers[0]?.name || '', photo: null, capacity: '', acquired: '', odometer: '', remarks: '', docs: [],
   });
   const [err, setErr] = useState('');
   if (!can(state.user, 'editAsset')) return <div className="page"><Empty title="Only the Fleet / Transport Officer can add or edit assets" /></div>;
@@ -59,6 +63,21 @@ export default function VehicleForm({ param }) {
               </label>
             ))}
           </div>
+          <div className="btn-row" style={{ marginTop: '8px' }}>
+            {newCat === null
+              ? <button type="button" className="btn btn-sm" id="vf-cat-add" onClick={() => setNewCat('')}><Icon n="plus" size={14} /> Add category</button>
+              : <>
+                  <input id="vf-cat-new" value={newCat} onChange={(e) => setNewCat(e.target.value)} placeholder="New category, e.g. Bus" autoFocus style={{ flex: 1, minWidth: '180px' }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('vf-cat-save').click(); } }} />
+                  <button type="button" className="btn btn-primary btn-sm" id="vf-cat-save" onClick={async () => {
+                    const n = newCat.trim(); if (n.length < 2) return;
+                    const dup = CATEGORIES.find((c) => c.toLowerCase() === n.toLowerCase());
+                    try { if (!dup) await act.quickAdd('categories', { name: n }); setF((x) => ({ ...x, category: dup || n })); setNewCat(null); if (!dup) notify(`Category "${n}" added`); }
+                    catch (x) { notify(x.message, 'error'); }
+                  }}>Add</button>
+                  <button type="button" className="btn btn-sm" onClick={() => setNewCat(null)}>Cancel</button>
+                </>}
+          </div>
           <p className="field-hint">Documents expected for this category: {requiredFor('fleet', f.category).join(', ')} (set in Administration → Document types).</p>
         </fieldset>
         <fieldset className="panel">
@@ -70,7 +89,7 @@ export default function VehicleForm({ param }) {
             <Field label="Year"><input id="vf-year" type="number" min="1990" max="2027" value={f.year} onChange={set('year')} /></Field>
             <Field label="Colour"><input id="vf-colour" value={f.colour} onChange={set('colour')} /></Field>
             <Field label="Capacity"><input id="vf-cap" value={f.capacity} onChange={set('capacity')} placeholder="e.g. 25 t, 5-ton" /></Field>
-            <Field label="Emirate of registration"><select id="vf-emirate" value={f.emirate} onChange={set('emirate')}><option>Dubai</option><option>Sharjah</option><option>Ajman</option><option>Abu Dhabi</option></select></Field>
+            <Field label="Emirate of registration"><AddableSelect id="vf-emirate" value={f.emirate} onChange={set('emirate')} options={withLookup(cfg, 'emirate', EMIRATES)} onAdd={(v) => act.addLookup('emirate', v)} placeholder="New emirate / country" /></Field>
             <Field label={machine ? 'Registration no. (if road-registered)' : 'Registration (plate) no.'}><input id="vf-plate" value={f.plate} onChange={set('plate')} placeholder="e.g. Dubai K 48210" /></Field>
             <Field label="Chassis / VIN / serial no."><input id="vf-vin" value={f.vin} onChange={set('vin')} required /></Field>
             <Field label="Engine no."><input id="vf-engine" value={f.engine} onChange={set('engine')} /></Field>
@@ -81,11 +100,11 @@ export default function VehicleForm({ param }) {
         <fieldset className="panel">
           <legend>Ownership &amp; operation</legend>
           <div className="form-grid cols-3">
-            <Field label="Owning / registered company" span={2} hint="Assets may be registered under Adroit or a group company."><select id="vf-co" value={f.company} onChange={set('company')}>{(cfg?.companies || []).filter((c) => c.active || c.name === f.company).map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></Field>
+            <Field label="Owning / registered company" span={2} hint="Assets may be registered under Adroit or a group company."><AddableSelect id="vf-co" value={f.company} onChange={set('company')} options={(cfg?.companies || []).filter((c) => (c.active && c.name !== 'Other') || c.name === f.company).map((c) => c.name)} onAdd={(v) => act.quickAdd('companies', { name: v })} placeholder="New company name" /></Field>
             <Field label="Operational / lifecycle status" hint="Inactive and Disposed assets keep their profile and history but leave expiry monitoring."><select id="vf-status" value={f.status} onChange={set('status')}>{STATUSES.map((c) => <option key={c}>{c}</option>)}</select></Field>
-            <Field label="Department / branch"><select id="vf-dept" value={f.department} onChange={set('department')}>{(cfg?.departments || []).filter((d) => d.active || d.name === f.department).map((d) => <option key={d.id}>{d.name}</option>)}</select></Field>
-            <Field label="Current location"><select id="vf-loc" value={f.location} onChange={set('location')}>{(cfg?.locations || []).filter((d) => d.active || d.name === f.location).map((d) => <option key={d.id}>{d.name}</option>)}</select></Field>
-            <Field label="Assigned category (use)"><select id="vf-use" value={f.usage} onChange={set('usage')}>{USAGE.map((c) => <option key={c}>{c}</option>)}</select></Field>
+            <Field label="Department / branch"><AddableSelect id="vf-dept" value={f.department} onChange={set('department')} options={(cfg?.departments || []).filter((d) => d.active || d.name === f.department).map((d) => d.name)} onAdd={(v) => act.quickAdd('departments', { name: v })} placeholder="New department / branch" /></Field>
+            <Field label="Current location"><AddableSelect id="vf-loc" value={f.location} onChange={set('location')} options={(cfg?.locations || []).filter((d) => d.active || d.name === f.location).map((d) => d.name)} onAdd={(v) => act.quickAdd('locations', { name: v })} placeholder="New location" /></Field>
+            <Field label="Assigned category (use)"><AddableSelect id="vf-use" value={f.usage} onChange={set('usage')} options={withLookup(cfg, 'usage', USAGE)} onAdd={(v) => act.addLookup('usage', v)} placeholder="New use, e.g. Rental" /></Field>
             <Field label="Responsible officer"><select id="vf-off" value={f.officer} onChange={set('officer')}>{fleetOfficers.map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}</select></Field>
             <Field label="Remarks" span={2}><input id="vf-rem" value={f.remarks} onChange={set('remarks')} /></Field>
           </div>
